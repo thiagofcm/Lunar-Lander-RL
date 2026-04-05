@@ -1,0 +1,3 @@
+Model: lunar_lander_models\navigation\ppo_nav_8m.zip
+Number of evaluation episodes: 500
+Mean reward: 287.2282

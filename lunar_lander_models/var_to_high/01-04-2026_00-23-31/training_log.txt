@@ -1,0 +1,6 @@
+===== TRAINING SUMMARY =====
+Type                : Variable Frame Rate to Highest
+Model               : lunar_lander_models/var_to_high/01-04-2026_00-23-31/ppo_var_to_high
+Total timesteps     : 1041968
+Total episodes      : 4500
+Training time (min) : 34.22
