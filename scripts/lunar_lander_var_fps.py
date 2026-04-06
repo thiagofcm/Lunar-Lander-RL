@@ -56,10 +56,11 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.0
+FPS_COST = 0.3
 ACTION_FPS = 25
 
-navigation_model = PPO.load("lunar_lander_models\\navigation\\30-03-2026_19-59-11\\ppo-nav.zip")
+navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
+navigation_model = PPO.load(navigation_model_path)
 
 
 class ContactDetector(contactListener):
@@ -485,7 +486,7 @@ class LunarLander_VarFramerate(LunarLander):
         # self.acc_nav_reward = 0
         # self.acc_fps_penalty = 0
         # self.acc_fps_value  = 0
-
+        #print(f"Augmented observation shape on RESET: {aug_obs.shape}")
         return aug_obs, {}
 
     def _create_particle(self, mass, x, y, ttl):
@@ -788,6 +789,7 @@ class LunarLander_VarFramerate(LunarLander):
         info["fps_penalty"] = fps_penalty
         info["reward"] = reward
         info["timeout"] = truncated and not terminated
+        #print(f"Augmented observation shape on STEP: {aug_obs.shape}")
 
         return aug_obs, reward, terminated, truncated, info
 

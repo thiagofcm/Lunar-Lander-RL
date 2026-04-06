@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
+from wrappers.common import TimeLimit
+
 def smooth(data, window=10):
     if len(data) < window:
         return data
@@ -31,7 +33,8 @@ if __name__ == "__main__":
     model_str = sys.argv[1]
 
     # Start Evaluation
-    eval_env = gym.make("LunarLander-v3", render_mode="human",render_mode="rgb_array")
+    eval_env = gym.make("LunarLander-v3", render_mode="human")
+    eval_env = TimeLimit(eval_env, max_episode_steps=500)
 
     n_eval_episodes = 10
     episode_rewards = []

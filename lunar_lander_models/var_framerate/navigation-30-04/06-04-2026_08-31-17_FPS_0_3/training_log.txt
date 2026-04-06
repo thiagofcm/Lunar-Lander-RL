@@ -1,0 +1,6 @@
+===== TRAINING SUMMARY =====
+Type                : Navigation
+Model               : lunar_lander_models/var_framerate/06-04-2026_08-31-17_FPS_0_3/ppo_var_fps_cost_0_3
+Total timesteps     : 8468960
+Total episodes      : 37400
+Training time (min) : 297.07

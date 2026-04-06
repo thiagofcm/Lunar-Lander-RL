@@ -56,7 +56,8 @@ MAIN_ENGINE_Y_LOCATION = (
 VIEWPORT_W = 600
 VIEWPORT_H = 400
 
-navigation_model = PPO.load("lunar_lander_models\\navigation\\30-03-2026_19-59-11\\ppo-nav.zip")
+navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
+navigation_model = PPO.load(navigation_model_path)
 
 class ContactDetector(contactListener):
     def __init__(self, env):

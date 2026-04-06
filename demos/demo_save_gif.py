@@ -32,7 +32,7 @@ class RewardCallback(BaseCallback):
 if __name__ == "__main__":
     model_str = sys.argv[1]
 
-    output_dir = f"demos/navigation/gif_outputs_{os.path.basename(model_str).split('.zip')[0]}"
+    output_dir = f"demos/navigation/gif_outputs_criteria_{os.path.basename(model_str).split('.zip')[0]}"
     os.makedirs(output_dir, exist_ok=True)
 
     # Start Evaluation

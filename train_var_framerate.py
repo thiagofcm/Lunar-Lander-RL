@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -8,6 +9,7 @@ from scripts.lunar_lander_var_fps import FPS_COST
 from gymnasium.wrappers import TimeLimit
 import gymnasium as gym
 import scripts.lunar_lander_var_fps as lunar_lander_var_fps
+from scripts.lunar_lander_var_fps import navigation_model_path
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -398,6 +400,9 @@ if __name__ == "__main__":
     checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=4000,smooth_window=20,verbose=1)
     callback_list = CallbackList([reward_callback, nav_reward_callback, fps_penalty_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 
+    # Start Training
+    start_time = time.time()
+
     model = RecurrentPPO(
         policy="MlpLstmPolicy",
         env=env,
@@ -410,11 +415,25 @@ if __name__ == "__main__":
         verbose=1,
     )
 
-    # Start training
     model.learn(total_timesteps=16_000_000, callback=callback_list)
     model_name = f"ppo_var_fps_cost_{fps_cost_str}"
     model.save(f"{model_dir}/{model_name}")
+
+    end_time = time.time()
+    training_time = (end_time - start_time)/60 # in minutes
+    training_total_timesteps = model.num_timesteps
+    training_total_episodes = reward_callback.episode_count
+    log_file = os.path.join(model_dir, "training_log.txt")
     env.close()
+
+    with open(log_file, "w") as f:
+        f.write("===== TRAINING SUMMARY =====\n")
+        f.write(f"Type                : Navigation\n")
+        f.write(f"Trained Model         : {model_dir}/{model_name}\n")
+        f.write(f"Navigation Model used : {navigation_model_path}\n")
+        f.write(f"Total timesteps     : {training_total_timesteps}\n")
+        f.write(f"Total episodes      : {training_total_episodes}\n")
+        f.write(f"Training time (min) : {training_time:.2f}\n")
     
     # Plot Episode Total Reward x Episode
     ep = np.array(reward_callback.episode_idx)
@@ -425,7 +444,7 @@ if __name__ == "__main__":
     plt.figure()
     plt.plot(ep, rew, alpha=0.3, label="Raw")
     plt.plot(ep_s, rew_s, linewidth=2, label="Smoothed")
-    plt.ylim(-100, 350)
+    plt.ylim(-400, 350)
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.title(f"Training Total Reward vs Episode - FPS COST: {FPS_COST}")
@@ -462,7 +481,7 @@ if __name__ == "__main__":
     plt.plot(ep_nav_s, nav_rew_s, linewidth=2, label="Smoothed")
     plt.xlabel("Episode")
     plt.ylabel("Nav Reward")
-    plt.ylim(-100, 350)
+    plt.ylim(-400, 350)
     plt.title(f"Training Nav Reward vs Episode - FPS COST: {FPS_COST}")
     plt.grid(True)
     plt.savefig(os.path.join(output_plots_dir, f"train_nav_rew_vs_ep.png"), dpi=300, bbox_inches="tight")
@@ -555,7 +574,7 @@ if __name__ == "__main__":
     plt.figure()
     plt.plot(ep_eval, rew_eval, alpha=0.3, label="Raw")
     plt.plot(ep_eval_s, rew_eval_s, linewidth=2, label="Smoothed")
-    plt.ylim(-100, 350)
+    plt.ylim(-400, 350)
     plt.xlabel("Evaluation Episode")
     plt.ylabel("Total Reward")
     plt.title("Evaluation Reward vs Episode")

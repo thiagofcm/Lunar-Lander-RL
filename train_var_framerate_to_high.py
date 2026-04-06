@@ -7,6 +7,7 @@ from sb3_contrib import RecurrentPPO
 from datetime import datetime
 import time
 import scripts.lunar_lander_var_to_high as lunar_lander_var_to_high
+from scripts.lunar_lander_var_to_high import navigation_model_path
 import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
@@ -328,7 +329,7 @@ if __name__ == "__main__":
     # Callback declaration
     reward_callback = EpisodeRewardCallback(n_envs=N_ENV)
     chosen_fps_callback = EpisodeChosenFPSCallback(n_envs=N_ENV)
-    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=100, tolerance=10.0, patience=10, min_episodes=200, verbose=1)
+    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=10.0, patience=10, min_episodes=2000, verbose=1)
     checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=4000,smooth_window=20,verbose=1)
     callback_list = CallbackList([reward_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 
@@ -360,11 +361,12 @@ if __name__ == "__main__":
 
     with open(log_file, "w") as f:
         f.write("===== TRAINING SUMMARY =====\n")
-        f.write(f"Type                : Variable Frame Rate to Highest\n")
-        f.write(f"Model               : {model_dir}/{model_name}\n")
-        f.write(f"Total timesteps     : {training_total_timesteps}\n")
-        f.write(f"Total episodes      : {training_total_episodes}\n")
-        f.write(f"Training time (min) : {training_time:.2f}\n")
+        f.write(f"Type                  : Variable Frame Rate to Highest\n")
+        f.write(f"Trained Model         : {model_dir}/{model_name}\n")
+        f.write(f"Navigation Model used : {navigation_model_path}\n")
+        f.write(f"Total timesteps       : {training_total_timesteps}\n")
+        f.write(f"Total episodes        : {training_total_episodes}\n")
+        f.write(f"Training time (min)   : {training_time:.2f}\n")
     
     # Plot Episode Total Reward x Episode
     ep = np.array(reward_callback.episode_idx)

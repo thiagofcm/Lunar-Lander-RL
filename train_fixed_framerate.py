@@ -3,9 +3,11 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.callbacks import CallbackList
+import time
 from datetime import datetime
 import gymnasium as gym
 import scripts.lunar_lander_fixed_fps as lunar_lander_fixed_fps
+from scripts.lunar_lander_fixed_fps import navigation_model_path
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -16,6 +18,138 @@ def smooth(data, window=10):
     if len(data) < window:
         return data
     return np.convolve(data, np.ones(window)/window, mode="valid")
+
+class EpisodeCheckpointPlotCallback(BaseCallback):
+    def __init__(
+        self,
+        reward_callback,
+        chosen_fps_callback,
+        output_root_dir,
+        checkpoint_every_episodes=4000,
+        smooth_window=20,
+        verbose=0,
+    ):
+        super().__init__(verbose)
+        self.reward_callback = reward_callback
+        self.chosen_fps_callback = chosen_fps_callback
+        self.output_root_dir = output_root_dir
+        self.checkpoint_every_episodes = checkpoint_every_episodes
+        self.smooth_window = smooth_window
+
+        self.last_checkpoint_episode = 0
+
+        os.makedirs(self.output_root_dir, exist_ok=True)
+
+    def _on_step(self) -> bool:
+        dones = self.locals.get("dones", [])
+        if dones is None:
+            return True
+
+        # Count how many envs finished in this rollout step
+        finished_now = int(np.sum(dones))
+
+        if finished_now == 0:
+            return True
+
+        # Total finished episodes tracked from reward callback
+        total_episodes = len(self.reward_callback.episode_idx)
+
+        # Save checkpoint plots every N episodes
+        while total_episodes >= self.last_checkpoint_episode + self.checkpoint_every_episodes:
+            self.last_checkpoint_episode += self.checkpoint_every_episodes
+            self._save_checkpoint_plots(self.last_checkpoint_episode)
+
+        return True
+
+    def _save_checkpoint_plots(self, checkpoint_ep):
+        checkpoint_dir = os.path.join(
+            self.output_root_dir, f"checkpoint_ep_{checkpoint_ep}"
+        )
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
+        # =========================
+        # Plot Episode Total Reward x Episode
+        # =========================
+        ep = np.array(self.reward_callback.episode_idx)
+        rew = np.array(self.reward_callback.episode_rewards)
+
+        print(f"=== Saving checkpoint plots at episode {checkpoint_ep} ===")
+        print(f"Total episodes available: {len(ep)}")
+
+        if len(ep) > 0 and len(rew) > 0:
+            rew_s = smooth(rew, window=self.smooth_window)
+            ep_s = ep[len(ep) - len(rew_s):] if len(rew_s) > 0 else np.array([])
+
+            plt.figure()
+            plt.plot(ep, rew, alpha=0.3, label="Raw")
+            if len(rew_s) > 0:
+                plt.plot(ep_s, rew_s, linewidth=2, label="Smoothed")
+            plt.ylim(-400, 350)
+            plt.xlabel("Episode")
+            plt.ylabel("Total Reward")
+            plt.title(f"Training Total Reward vs Episode (up to {checkpoint_ep})")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(
+                os.path.join(checkpoint_dir, "train_total_rew_vs_ep.png"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
+
+        # =========================
+        # Plot Mean Reward x Episode
+        # =========================
+        ep_mean = np.array(self.reward_callback.episode_idx)
+        mean_rew = np.array(self.reward_callback.mean_episode_rewards)
+
+        if len(ep_mean) > 0 and len(mean_rew) > 0:
+            mean_rew_s = smooth(mean_rew, window=self.smooth_window)
+            ep_mean_s = ep_mean[len(ep_mean) - len(mean_rew_s):] if len(mean_rew_s) > 0 else np.array([])
+
+            plt.figure()
+            plt.plot(ep_mean, mean_rew, alpha=0.3, label="Raw")
+            if len(mean_rew_s) > 0:
+                plt.plot(ep_mean_s, mean_rew_s, linewidth=2, label="Smoothed")
+            plt.ylim(-400, 350)
+            plt.xlabel("Episode")
+            plt.ylabel("Mean Reward")
+            plt.title(f"Mean Reward vs Episode (up to {checkpoint_ep})")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(
+                os.path.join(checkpoint_dir, "train_mean_rew_vs_ep.png"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
+
+        # =========================
+        # Plot Mean Chosen FPS x Episode
+        # =========================
+        ep_fps = np.array(self.chosen_fps_callback.episode_idx)
+        mean_fps = np.array(self.chosen_fps_callback.episode_mean_fps)
+
+        if len(ep_fps) > 0 and len(mean_fps) > 0:
+            mean_fps_s = smooth(mean_fps, window=self.smooth_window)
+            ep_fps_s = ep_fps[len(ep_fps) - len(mean_fps_s):] if len(mean_fps_s) > 0 else np.array([])
+
+            plt.figure()
+            plt.plot(ep_fps, mean_fps, alpha=0.3, label="Raw")
+            if len(mean_fps_s) > 0:
+                plt.plot(ep_fps_s, mean_fps_s, linewidth=2, label="Smoothed")
+            plt.ylim(0, 55)
+            plt.xlabel("Episode")
+            plt.ylabel("Mean Chosen FPS")
+            plt.title(f"Training Mean Chosen FPS vs Episode (up to {checkpoint_ep})")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(
+                os.path.join(checkpoint_dir, "train_mean_chosen_fps_vs_ep.png"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
 
 class EpisodeRewardCallback(BaseCallback):
     def __init__(self, n_envs, verbose=0):
@@ -135,7 +269,7 @@ class FixedFPSEpisodeCallback(BaseCallback):
         super().__init__(verbose)
         self.n_envs = n_envs
 
-        self.mean_chosen_fps = []
+        self.episode_mean_fps = []
         self.episode_idx = []
         self.episode_count = 0
 
@@ -149,7 +283,7 @@ class FixedFPSEpisodeCallback(BaseCallback):
 
                 self.episode_count += 1
                 self.episode_idx.append(self.episode_count)
-                self.mean_chosen_fps.append(chosen_fps)
+                self.episode_mean_fps.append(chosen_fps)
 
         return True
 
@@ -172,8 +306,13 @@ if __name__ == "__main__":
     #env = gym.make("LunarLander_FixedFramerate")
     model_architecture = "PPO"
     reward_callback = EpisodeRewardCallback(n_envs=N_ENV)
+    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV,window_size=10000,tolerance=10.0,patience=10,min_episodes=20000,verbose=1,)
     chosen_fps_callback = FixedFPSEpisodeCallback(n_envs=N_ENV)
-    callback_list = CallbackList([reward_callback, chosen_fps_callback])
+    checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=10000,smooth_window=20,verbose=1)
+    callback_list = CallbackList([reward_callback, convergence_callback, chosen_fps_callback, checkpoint_plot_callback])
+
+    # Start Training
+    start_time = time.time()
 
     model = PPO(
         policy="MlpPolicy",
@@ -187,11 +326,25 @@ if __name__ == "__main__":
         verbose=1,
     )
 
-    # Start training
-    model.learn(total_timesteps=100_000, callback=callback_list)
+    model.learn(total_timesteps=2_000_000, callback=callback_list)
     model_name = f"ppo_fixed_fps"
     model.save(f"{model_dir}/{model_name}")
+
+    end_time = time.time()
+    training_time = (end_time - start_time)/60 # in minutes
+    training_total_timesteps = model.num_timesteps
+    training_total_episodes = reward_callback.episode_count
+    log_file = os.path.join(model_dir, "training_log.txt")
     env.close()
+
+    with open(log_file, "w") as f:
+        f.write("===== TRAINING SUMMARY =====\n")
+        f.write(f"Type                  : Fixed Framerate\n")
+        f.write(f"Trained Model         : {model_dir}/{model_name}\n")
+        f.write(f"Navigation Model used : {navigation_model_path}\n")
+        f.write(f"Total timesteps       : {training_total_timesteps}\n")
+        f.write(f"Total episodes        : {training_total_episodes}\n")
+        f.write(f"Training time (min)   : {training_time:.2f}\n")
 
     # Plot Episode Total Reward x Episode
     ep = np.array(reward_callback.episode_idx)
@@ -229,7 +382,7 @@ if __name__ == "__main__":
 
     # Plot Mean Chosen Fps x Episode
     ep_fps = np.array(chosen_fps_callback.episode_idx)
-    mean_fps = np.array(chosen_fps_callback.mean_chosen_fps)
+    mean_fps = np.array(chosen_fps_callback.episode_mean_fps)
     mean_fps_s = smooth(mean_fps, window=100)
     ep_fps_s = ep_fps[len(ep_fps) - len(mean_fps_s):]
 

@@ -1,6 +1,0 @@
-===== TRAINING SUMMARY =====
-Type                : Navigation
-Model               : lunar_lander_models/navigation/31-03-2026_20-03-16/ppo-nav
-Total timesteps     : 585440
-Total episodes      : 2600
-Training time (min) : 5.40
