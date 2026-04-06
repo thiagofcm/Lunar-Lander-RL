@@ -1,0 +1,7 @@
+===== TRAINING SUMMARY =====
+Type                  : Fixed Framerate
+Trained Model         : lunar_lander_models/fixed_framerate/06-04-2026_17-56-48/ppo_fixed_fps
+Navigation Model used : lunar_lander_models\navigation\01-04-2026_12-52-25\ppo-nav.zip
+Total timesteps       : 120000
+Total episodes        : 120000
+Training time (min)   : 30.87
