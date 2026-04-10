@@ -56,7 +56,7 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.3
+FPS_COST = 0.0
 ACTION_FPS = 25
 
 navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
@@ -356,7 +356,7 @@ class LunarLander_VarFramerate(LunarLander):
         gym.Env.reset(self, seed=seed)
 
         self._destroy()
-        #self.world_step_count = 0
+        self.world_step_count = 0
         # Bug's workaround for: https://github.com/Farama-Foundation/Gymnasium/issues/728
         # Not sure why the self._destroy() is not enough to clean(reset) the total world environment elements, need more investigation on the root cause,
         # we must create a totally new world for self.reset(), or the bug#728 will happen
@@ -479,6 +479,8 @@ class LunarLander_VarFramerate(LunarLander):
         self.current_obs = np.array(obs, dtype=np.float32)
         self.last_sampled_obs = np.array(obs, dtype=np.float32)
         self.current_fps = self.fps_choices[0]
+        self.obs_interval = int(self.simulation_fps/self.current_fps)
+        self.action_interval = self.obs_interval
         self.steps_since_last_obs = 0
         aug_obs = self._get_augmented_obs()
         self.episode_frame_count = 1

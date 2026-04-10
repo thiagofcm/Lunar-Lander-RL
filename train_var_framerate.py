@@ -67,6 +67,8 @@ class EpisodeCheckpointPlotCallback(BaseCallback):
             self.output_root_dir, f"checkpoint_ep_{checkpoint_ep}"
         )
         os.makedirs(checkpoint_dir, exist_ok=True)
+        model_path = os.path.join(checkpoint_dir, "model")
+        self.model.save(model_path)
 
         # =========================
         # Plot Episode Total Reward x Episode
@@ -150,6 +152,24 @@ class EpisodeCheckpointPlotCallback(BaseCallback):
                 dpi=300,
                 bbox_inches="tight",
             )
+            plt.close()
+        
+            # Plot Fps Penalty x Episode
+            ep_fps_pen = np.array(fps_penalty_callback.episode_idx)
+            fps_pen = np.array(fps_penalty_callback.episode_fps_penalty)
+            fps_pen_s = smooth(fps_pen, window=20)
+            ep_fps_pen_s = ep_fps_pen[len(ep_fps_pen) - len(fps_pen_s):]
+
+            plt.figure()
+            plt.plot(ep_fps_pen, fps_pen, alpha=0.3, label="Raw")
+            plt.plot(ep_fps_pen_s, fps_pen_s, linewidth=2, label="Smoothed")
+            plt.ylim(-100, 350)
+            plt.xlabel("Episode")
+            plt.ylabel("FPS Penalty")
+            plt.title(f"Training FPS Penalty vs Episode - FPS COST: {FPS_COST}")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(os.path.join(checkpoint_dir, f"train_fps_penalty_vs_ep.png"), dpi=300, bbox_inches="tight")
             plt.close()
 
 class EpisodeRewardCallback(BaseCallback):
@@ -396,8 +416,8 @@ if __name__ == "__main__":
     nav_reward_callback = EpisodeNavRewardCallback(n_envs=N_ENV)
     fps_penalty_callback = EpisodeFPSPenaltyCallback(n_envs=N_ENV)
     chosen_fps_callback = EpisodeChosenFPSCallback(n_envs=N_ENV)
-    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=100, tolerance=4.0, patience=5, min_episodes=200, verbose=1)
-    checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=4000,smooth_window=20,verbose=1)
+    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=100, tolerance=10.0, patience=10, min_episodes=200, verbose=1)
+    checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=1000,smooth_window=20,verbose=1)
     callback_list = CallbackList([reward_callback, nav_reward_callback, fps_penalty_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 
     # Start Training
@@ -406,7 +426,7 @@ if __name__ == "__main__":
     model = RecurrentPPO(
         policy="MlpLstmPolicy",
         env=env,
-        n_steps=16,
+        n_steps=16, #128
         batch_size=64,
         n_epochs=4,
         gamma=0.999, 

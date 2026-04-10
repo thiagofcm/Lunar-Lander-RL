@@ -330,7 +330,7 @@ if __name__ == "__main__":
     reward_callback = EpisodeRewardCallback(n_envs=N_ENV)
     chosen_fps_callback = EpisodeChosenFPSCallback(n_envs=N_ENV)
     convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=10.0, patience=10, min_episodes=2000, verbose=1)
-    checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=4000,smooth_window=20,verbose=1)
+    checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=1000,smooth_window=20,verbose=1)
     callback_list = CallbackList([reward_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 
     # Start training
@@ -348,7 +348,7 @@ if __name__ == "__main__":
         verbose=1,
     )
 
-    model.learn(total_timesteps=8_000_000, callback=callback_list)
+    model.learn(total_timesteps=32_000_000, callback=callback_list)
     model_name = f"ppo_var_to_high"
     model.save(f"{model_dir}/{model_name}")
     env.close()
@@ -373,7 +373,7 @@ if __name__ == "__main__":
     rew = np.array(reward_callback.episode_rewards)
     print("=== Training Results - TOTAL REWARD X EPISODE ===")
     print(f"Total episodes: {len(ep)}")
-    print(f"Reward shape: {rew}")
+
     rew_s = smooth(rew, window=20)
     ep_s = ep[len(ep) - len(rew_s):]
 
