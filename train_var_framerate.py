@@ -13,6 +13,8 @@ from scripts.lunar_lander_var_fps import navigation_model_path
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from sequence_extractor_lstm import LSTMSequenceExtractor
+from stable_baselines3.ppo.ppo import PPO
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 def smooth(data, window=10):
@@ -395,6 +397,15 @@ class EpisodeChosenFPSCallback(BaseCallback):
 
 if __name__ == "__main__":
 
+    policy_kwargs = dict(
+        features_extractor_class=LSTMSequenceExtractor,
+        features_extractor_kwargs=dict(
+            features_dim=128,
+            lstm_hidden_size=128,
+            lstm_num_layers=1,
+        ),
+        net_arch=dict(pi=[64, 64], vf=[64, 64]),
+    )
     # Output Settings:
     fps_cost_str =str(FPS_COST).replace('.', '_')
 
@@ -423,16 +434,19 @@ if __name__ == "__main__":
     # Start Training
     start_time = time.time()
 
-    model = RecurrentPPO(
-        policy="MlpLstmPolicy",
+    model = PPO(
+        policy="MlpPolicy",
         env=env,
-        n_steps=16, #128
+        policy_kwargs=policy_kwargs,
+        n_steps=128, #128
         batch_size=64,
         n_epochs=4,
         gamma=0.999, 
         gae_lambda=0.98,
+        learning_rate=3e-4,
         ent_coef=0.01,
         verbose=1,
+        device="cpu",
     )
 
     model.learn(total_timesteps=16_000_000, callback=callback_list)

@@ -2,7 +2,7 @@ __credits__ = ["Andrea PIERRÉ"]
 
 import math
 from typing import TYPE_CHECKING
-
+from collections import deque
 import numpy as np
 import torch
 import gymnasium as gym
@@ -284,7 +284,12 @@ class LunarLander_VarFramerate(LunarLander):
         self.obs_interval = 1
         self.ep_action_dif_cost = 0
 
-        low = np.array(
+        # NEW APPROACH:
+        self.obs_seq_len = 8
+        self.single_obs_dim = 10
+        self.obs_buffer = deque(maxlen=self.obs_seq_len)
+
+        low_single = np.array(
             [
                 # these are bounds for position
                 # realistically the environment should have ended
@@ -298,11 +303,11 @@ class LunarLander_VarFramerate(LunarLander):
                 -10.0,
                 -0.0,
                 -0.0,
-                0.0,
-                0.0
+                0.0,  # obs age ratio lower bound
+                0.0   # fps ratio lower bound
             ]
         ).astype(np.float32)
-        high = np.array(
+        high_single = np.array(
             [
                 # these are bounds for position
                 # realistically the environment should have ended
@@ -316,13 +321,23 @@ class LunarLander_VarFramerate(LunarLander):
                 10.0,
                 1.0,
                 1.0,
-                1.0,
-                1.0                
+                1.0, # obs age ratio upper bound
+                1.0  # fps ratio upper bound          
             ]
         ).astype(np.float32)
 
+        low = np.repeat(low_single[None, :], self.obs_seq_len, axis=0)
+        high = np.repeat(high_single[None, :], self.obs_seq_len, axis=0)
+
+
         # useful range is -1 .. +1, but spikes can be higher
-        self.observation_space = spaces.Box(low, high)
+        #self.observation_space = spaces.Box(low, high)
+
+        self.observation_space = gym.spaces.Box(
+            low=low,
+            high=high,
+            dtype=np.float32
+        )
 
         # if self.continuous:
         #     # Action is two floats [main engine, left-right engines].
@@ -334,6 +349,9 @@ class LunarLander_VarFramerate(LunarLander):
         #     self.action_space = spaces.Discrete(4)
 
         self.render_mode = render_mode
+    
+    def _get_sequence_obs(self):
+        return np.stack(self.obs_buffer, axis=0).astype(np.float32)
 
     def _destroy(self):
         if not self.moon:
@@ -478,18 +496,26 @@ class LunarLander_VarFramerate(LunarLander):
         obs, _, _, _, _ = self._physics_step(0)
         self.current_obs = np.array(obs, dtype=np.float32)
         self.last_sampled_obs = np.array(obs, dtype=np.float32)
-        self.current_fps = self.fps_choices[0]
+        self.current_fps = self.fps_choices[-1]
         self.obs_interval = int(self.simulation_fps/self.current_fps)
         self.action_interval = self.obs_interval
         self.steps_since_last_obs = 0
         aug_obs = self._get_augmented_obs()
+        self.obs_buffer.clear()
+
+        for _ in range(self.obs_seq_len):
+            self.obs_buffer.append(aug_obs.copy())
+        
         self.episode_frame_count = 1
 
         # self.acc_nav_reward = 0
         # self.acc_fps_penalty = 0
         # self.acc_fps_value  = 0
-        #print(f"Augmented observation shape on RESET: {aug_obs.shape}")
-        return aug_obs, {}
+        new_obs = self._get_sequence_obs()
+        #print("=" * 40)
+        #print(f"Initial observation on RESET: {new_obs}")
+        #print(f"Augmented observation shape on RESET: {new_obs.shape}")
+        return new_obs, {}
 
     def _create_particle(self, mass, x, y, ttl):
         p = self.world.CreateDynamicBody(
@@ -728,72 +754,78 @@ class LunarLander_VarFramerate(LunarLander):
         return aug_obs
 
     def step(self, action):
-        self.world_step_count +=1
-        #print(self.world_step_count)
+        self.world_step_count += 1
+        # print(self.world_step_count)
 
-        # Check if an action will be taken this timestep 
-        if self.world_step_count % self.action_interval == 0:
-            self.current_fps = self.fps_choices[int(action)]
-            self.obs_interval = int(self.simulation_fps/self.current_fps)
-            # the action will be taken at the same time as the observation is sampled, 
-            # which means the action will be based on the most recent observation
-            self.action_interval = self.obs_interval 
-
-        if self.world_step_count % self.obs_interval == 0:
-            self.last_sampled_obs = self.current_obs.copy() 
-            #self.current_obs is initialized on reset function and updated every physics step, 
-            # so it always holds the most recent observation of the environment
-            self.steps_since_last_obs = 0
-            self.episode_frame_count += 1
-        else:
-            self.steps_since_last_obs += 1
-
-        #DEBUG
-        # print(f"Step {self.world_step_count}: FPS {self.current_fps}")
-        # stale_obs = self.last_sampled_obs
-        # fresh_obs =  self.current_obs.copy()
-        # print(f"stale_obs: {stale_obs}")
-        # print()
-        # print(f"fresh obs: {fresh_obs}")
-        #soft_disagreement, obs_change, ground_weight = self.compute_usefulness(navigation_model, stale_obs,fresh_obs)
-        
+        # Use the currently available sampled observation to compute control
         navigation_action, _ = navigation_model.predict(self.last_sampled_obs, deterministic=True)
+
         obs, nav_reward, terminated, truncated, info = self._physics_step(navigation_action)
-        self.current_obs = obs.copy()
-        fps_penalty = (FPS_COST * (self.current_fps/self.simulation_fps))
+        
+        fps_penalty = (FPS_COST * (self.current_fps / self.simulation_fps))
         reward = nav_reward - fps_penalty
         
-        # Accumulate Nav Reward, FPS penalty and FPS value (actions)
-        self.acc_nav_reward += nav_reward
-        self.acc_fps_penalty += fps_penalty
-        self.acc_fps_value += self.current_fps
-        
+        # Save FPS used for reward (old FPS)
+        fps_used_for_reward = self.current_fps
+
+        self.current_obs = obs.copy()
+
+        if self.steps_since_last_obs + 1 >= self.obs_interval:
+            self.last_sampled_obs = self.current_obs.copy()
+            # self.current_obs is updated every physics step,
+            # so here we store the fresh observation of this step
+            self.steps_since_last_obs = 0
+            self.episode_frame_count += 1
+
+            self.current_fps = self.fps_choices[int(action)]
+            self.obs_interval = int(self.simulation_fps / self.current_fps)
+            # the action is chosen at a sampling instant and affects future sampling
+            self.action_interval = self.obs_interval
+        else:
+            self.steps_since_last_obs += 1
+    
         aug_obs = self._get_augmented_obs()
+        self.obs_buffer.append(aug_obs.copy())
 
-        mean_nav_reward = self.acc_nav_reward / self.world_step_count
-        mean_fps_penalty = self.acc_fps_penalty / self.world_step_count
-        mean_fps_value = self.acc_fps_value / self.world_step_count
+        new_obs = self._get_sequence_obs()
+        #print(f"Observation on STEP: {new_obs}")
 
-        # if terminated or truncated:
-        #     self.episode_count+=1
-
-        # DEBUG
-        # print(f"Mean nav reward : {mean_nav_reward:.4f}")
-        # print(f"Mean FPS penalty: {mean_fps_penalty:.4f}")
-        # print(f"Mean chosen FPS : {mean_fps_value:.2f}")
-        # print(f"Episode Count: {self.episode_count}")
-        
         info = dict(info)
         info["chosen_fps"] = self.current_fps
         info["episode_frame_count"] = self.episode_frame_count
-        #info["obs_interval"] = obs_interval
         info["nav_reward"] = nav_reward
         info["fps_penalty"] = fps_penalty
         info["reward"] = reward
         info["timeout"] = truncated and not terminated
-        #print(f"Augmented observation shape on STEP: {aug_obs.shape}")
 
-        return aug_obs, reward, terminated, truncated, info
+
+        # ================= DEBUG =================
+        last_row = self.obs_buffer[-1]
+
+        obs_age = last_row[-2]        # obs_age_ratio
+        fps_ratio_obs = last_row[-1]  # fps_ratio from observation
+        fps_ratio_true = self.current_fps / self.simulation_fps
+
+        # print("=" * 50)
+        # print(f"Step: {self.world_step_count}")
+        # print(f"Steps since last obs: {self.steps_since_last_obs}")
+        # print(f"Current FPS: {self.current_fps}")
+        # print(f"Obs interval: {self.obs_interval}")
+
+        # print(f"OBS → age_ratio: {obs_age:.2f}, fps_ratio: {fps_ratio_obs:.2f}")
+        # print(f"TRUE → fps_ratio: {fps_ratio_true:.2f}")
+
+        # print(f"Reward: {reward:.4f} (nav: {nav_reward:.4f}, penalty: {fps_penalty:.4f})")
+        # print(f"FPS used for reward: {fps_used_for_reward}")
+
+        # Check if an action will be taken this timestep
+        # if self.steps_since_last_obs + 1 >= self.action_interval:
+        #     self.current_fps = self.fps_choices[int(action)]
+        #     self.obs_interval = int(self.simulation_fps / self.current_fps)
+        #     # the action is chosen at a sampling instant and affects future sampling
+        #     self.action_interval = self.obs_interval
+
+        return self._get_sequence_obs(), reward, terminated, truncated, info
 
     def render(self):
         if self.render_mode is None:
