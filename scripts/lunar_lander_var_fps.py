@@ -56,7 +56,7 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.0
+FPS_COST = 0.6
 ACTION_FPS = 25
 
 navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
@@ -269,8 +269,9 @@ class LunarLander_VarFramerate(LunarLander):
 
         # SENSOR FRAMERATE SETTINGS:
         self.simulation_fps= FPS
-        self.fps_choices = [1,5,10,25,50]
+        self.fps_choices = [1,50]
         self.action_space = spaces.Discrete(len(self.fps_choices))
+        self.navigation_action_space = spaces.Discrete(4) 
         self.current_obs = None
         self.episode_count = 0
         self.world_step_count = 0
@@ -286,7 +287,7 @@ class LunarLander_VarFramerate(LunarLander):
 
         # NEW APPROACH:
         self.obs_seq_len = 8
-        self.single_obs_dim = 10
+        self.single_obs_dim = 18 # 8 original obs + 8 mask + 2 mask values
         self.obs_buffer = deque(maxlen=self.obs_seq_len)
 
         low_single = np.array(
@@ -294,15 +295,20 @@ class LunarLander_VarFramerate(LunarLander):
                 # these are bounds for position
                 # realistically the environment should have ended
                 # long before we reach more than 50% outside
+
+                # observation values (8)
                 -2.5,  # x coordinate
                 -2.5,  # y coordinate
-                # velocity bounds is 5x rated speed
-                -10.0,
-                -10.0,
+                -10.0, # vx
+                -10.0, # vy
                 -2 * math.pi,
-                -10.0,
-                -0.0,
-                -0.0,
+                -10.0, # angular velocity
+                0.0,   # left leg contact
+                0.0,   # right leg contact
+
+                # observation mask (8)
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+
                 0.0,  # obs age ratio lower bound
                 0.0   # fps ratio lower bound
             ]
@@ -312,20 +318,27 @@ class LunarLander_VarFramerate(LunarLander):
                 # these are bounds for position
                 # realistically the environment should have ended
                 # long before we reach more than 50% outside
-                2.5,  # x coordinate
-                2.5,  # y coordinate
-                # velocity bounds is 5x rated speed
-                10.0,
-                10.0,
+
+                # observation values (8)
+                2.5,   # x coordinate
+                2.5,   # y coordinate
+                10.0,  # vx
+                10.0,  # vy
                 2 * math.pi,
-                10.0,
-                1.0,
-                1.0,
-                1.0, # obs age ratio upper bound
-                1.0  # fps ratio upper bound          
+                10.0,  # angular velocity
+                1.0,   # left leg contact
+                1.0,   # right leg contact
+
+                # observation mask (8)
+                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                
+                # extras (2)
+                1.0,   # obs age ratio
+                1.0    # fps ratio
+
             ]
         ).astype(np.float32)
-
+        
         low = np.repeat(low_single[None, :], self.obs_seq_len, axis=0)
         high = np.repeat(high_single[None, :], self.obs_seq_len, axis=0)
 
@@ -492,7 +505,8 @@ class LunarLander_VarFramerate(LunarLander):
 
         if self.render_mode == "human":
             self.render()
-
+        
+        self.obs_buffer.clear()
         obs, _, _, _, _ = self._physics_step(0)
         self.current_obs = np.array(obs, dtype=np.float32)
         self.last_sampled_obs = np.array(obs, dtype=np.float32)
@@ -500,21 +514,36 @@ class LunarLander_VarFramerate(LunarLander):
         self.obs_interval = int(self.simulation_fps/self.current_fps)
         self.action_interval = self.obs_interval
         self.steps_since_last_obs = 0
-        aug_obs = self._get_augmented_obs()
-        self.obs_buffer.clear()
+
+        obs_values = self.last_sampled_obs.copy()
+        obs_mask = np.ones_like(self.last_sampled_obs, dtype=np.float32)
+
+        aug_obs = self._get_augmented_obs(obs_values, obs_mask)
 
         for _ in range(self.obs_seq_len):
             self.obs_buffer.append(aug_obs.copy())
         
         self.episode_frame_count = 1
 
-        # self.acc_nav_reward = 0
-        # self.acc_fps_penalty = 0
-        # self.acc_fps_value  = 0
         new_obs = self._get_sequence_obs()
-        #print("=" * 40)
+        
         #print(f"Initial observation on RESET: {new_obs}")
         #print(f"Augmented observation shape on RESET: {new_obs.shape}")
+        
+        # print("=" * 80)
+        # print("RESET")
+
+        # for i in range(new_obs.shape[0]):
+        #     obs_vals = new_obs[i, :8]
+        #     obs_mask = new_obs[i, 8:16]
+        #     extras = new_obs[i, 16:]
+
+        #     print(f"[timestep {i}]")
+        #     print(f"  obs:   {obs_vals}")
+        #     print(f"  mask:  {obs_mask}  (sum={obs_mask.sum()})")
+        #     print(f"  extra: age={extras[0]:.3f}, fps={extras[1]:.3f}")
+        #     print("-" * 40)
+                
         return new_obs, {}
 
     def _create_particle(self, mass, x, y, ttl):
@@ -580,7 +609,7 @@ class LunarLander_VarFramerate(LunarLander):
         if self.continuous:
             action = np.clip(action, -1, +1).astype(np.float64)
         else:
-            assert self.action_space.contains(action), (
+            assert self.navigation_action_space.contains(action), (
                 f"{action!r} ({type(action)}) invalid "
             )
 
@@ -736,7 +765,7 @@ class LunarLander_VarFramerate(LunarLander):
         # truncation=False as the time limit is handled by the `TimeLimit` wrapper added during `make`
         return np.array(state, dtype=np.float32), reward, terminated, False, {}
         
-    def _get_augmented_obs(self):
+    def _get_augmented_obs(self, obs_values, obs_mask):
         obs_age_steps = self.steps_since_last_obs
         # normalizing the num of steps since last obs
         obs_age_ratio = obs_age_steps / self.simulation_fps
@@ -744,12 +773,9 @@ class LunarLander_VarFramerate(LunarLander):
         fps_ratio = self.current_fps/self.simulation_fps
 
         aug_obs = np.concatenate([
-            self.last_sampled_obs.astype(np.float32),
-            np.array([
-                obs_age_ratio,
-                fps_ratio,
-            ], dtype=np.float32)
-        ])
+            obs_values.astype(np.float32),
+            obs_mask.astype(np.float32),
+            np.array([obs_age_ratio,fps_ratio], dtype=np.float32)])
 
         return aug_obs
 
@@ -781,14 +807,34 @@ class LunarLander_VarFramerate(LunarLander):
             self.obs_interval = int(self.simulation_fps / self.current_fps)
             # the action is chosen at a sampling instant and affects future sampling
             self.action_interval = self.obs_interval
+            obs_values = self.last_sampled_obs.copy()
+            obs_mask = np.ones_like(self.last_sampled_obs, dtype=np.float32)
         else:
             self.steps_since_last_obs += 1
+            obs_values = self.last_sampled_obs.copy()
+            obs_mask = np.zeros_like(self.last_sampled_obs, dtype=np.float32)
     
-        aug_obs = self._get_augmented_obs()
+        aug_obs = self._get_augmented_obs(obs_values, obs_mask)
         self.obs_buffer.append(aug_obs.copy())
 
         new_obs = self._get_sequence_obs()
         #print(f"Observation on STEP: {new_obs}")
+
+
+        #print("=" * 80)
+        #print("STEP")
+
+        # for i in range(new_obs.shape[0]):
+        #     obs_vals = new_obs[i, :8]
+        #     obs_mask = new_obs[i, 8:16]
+        #     extras = new_obs[i, 16:]
+
+        #     print(f"[timestep {i}]")
+        #     print(f"  obs:   {obs_vals}")
+        #     print(f"  mask:  {obs_mask}  (sum={obs_mask.sum()})")
+        #     print(f"  extra: age_ratio={extras[0]:.3f}, fps_ratio={extras[1]:.3f}")
+        #     print("-" * 40)
+
 
         info = dict(info)
         info["chosen_fps"] = self.current_fps
@@ -800,11 +846,11 @@ class LunarLander_VarFramerate(LunarLander):
 
 
         # ================= DEBUG =================
-        last_row = self.obs_buffer[-1]
+        #last_row = self.obs_buffer[-1]
 
-        obs_age = last_row[-2]        # obs_age_ratio
-        fps_ratio_obs = last_row[-1]  # fps_ratio from observation
-        fps_ratio_true = self.current_fps / self.simulation_fps
+        #obs_age = last_row[-2]        # obs_age_ratio
+        #fps_ratio_obs = last_row[-1]  # fps_ratio from observation
+        #fps_ratio_true = self.current_fps / self.simulation_fps
 
         # print("=" * 50)
         # print(f"Step: {self.world_step_count}")
@@ -825,6 +871,7 @@ class LunarLander_VarFramerate(LunarLander):
         #     # the action is chosen at a sampling instant and affects future sampling
         #     self.action_interval = self.obs_interval
 
+        #print(f"Augmented observation shape on STEP: {new_obs.shape}")
         return self._get_sequence_obs(), reward, terminated, truncated, info
 
     def render(self):

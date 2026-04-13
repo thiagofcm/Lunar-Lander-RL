@@ -173,3 +173,5 @@ def evaluate():
 # =========================
 if __name__ == "__main__":
     evaluate()
+
+# python -m demos.demo_var_framerate lunar_lander_models\var_framerate\11-04-2026_17-35-15_FPS_0_0\ppo_var_fps_cost_0_0.zip

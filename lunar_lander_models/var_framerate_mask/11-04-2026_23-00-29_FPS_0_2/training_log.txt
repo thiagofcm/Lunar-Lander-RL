@@ -1,0 +1,7 @@
+===== TRAINING SUMMARY =====
+Type                : Navigation
+Trained Model         : lunar_lander_models/var_framerate_mask/11-04-2026_23-00-29_FPS_0_2/ppo_var_fps_cost_0_2
+Navigation Model used : lunar_lander_models\navigation\01-04-2026_12-52-25\ppo-nav.zip
+Total timesteps     : 3162560
+Total episodes      : 17000
+Training time (min) : 59.41
