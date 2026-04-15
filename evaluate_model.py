@@ -20,8 +20,8 @@ from scripts.lunar_lander_var_fps import FPS_COST
 # =========================
 # USER INPUT (ONLY CHANGE THESE)
 # =========================
-MODEL_PATH = "lunar_lander_models\\var_framerate_kl\\07-04-2026_19-22-25_FPS_0_4\\plots\\checkpoint_ep_90000\\model.zip"
-OUTPUT_DIR = "lunar_lander_models\\var_framerate_kl\\07-04-2026_19-22-25_FPS_0_4\\plots"
+MODEL_PATH = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo-nav.zip"
+OUTPUT_DIR = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\plots_eval"
 
 
 # =========================

@@ -408,7 +408,7 @@ if __name__ == "__main__":
     )
     # Output Settings:
     fps_cost_str =str(FPS_COST).replace('.', '_')
-    fps_choices = [1,5,10,25,50]
+    fps_choices = [1,5,10,50]
 
     current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     model_dir = f"lunar_lander_models/var_framerate_new_mask_V2/{current_time}_FPS_{fps_cost_str}"

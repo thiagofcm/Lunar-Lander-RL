@@ -1,5 +1,6 @@
 __credits__ = ["Andrea PIERRÉ"]
 
+from faulthandler import register
 import math
 from typing import TYPE_CHECKING
 
@@ -10,8 +11,8 @@ from gymnasium import error, spaces
 from gymnasium.error import DependencyNotInstalled
 from gymnasium.utils import EzPickle
 from gymnasium.utils.step_api_compatibility import step_api_compatibility
-from gymnasium.envs.registration import register
 from gymnasium.envs.box2d.lunar_lander import LunarLander
+from gymnasium.envs.registration import register
 
 
 try:
@@ -448,6 +449,8 @@ class LunarLander_Nav(LunarLander):
 
         if self.render_mode == "human":
             self.render()
+        
+        self.touchdown_flag = False
         return self.step(np.array([0, 0]) if self.continuous else 0)[0], {}
 
     def _create_particle(self, mass, x, y, ttl):
@@ -650,11 +653,18 @@ class LunarLander_Nav(LunarLander):
             reward = shaping - self.prev_shaping
         self.prev_shaping = shaping
 
-        print("without fuel penalty")
-        # reward -= (
-        #     m_power * 0.30
-        # )  # less fuel spent is better, about -30 for heuristic landing
-        # reward -= s_power * 0.03
+        reward -= (
+            m_power * 0.30
+        )  # less fuel spent is better, about -30 for heuristic landing
+        reward -= s_power * 0.03
+
+        # --- Smooth landing penalty ---
+        touchdown_check = (state[6] or state[7]) and not self.touchdown_flag
+        if touchdown_check:
+            reward -= 50 * abs(state[3])  # vertical velocity
+            #reward -= 5 * abs(state[2])  # horizontal velocity
+            #reward -= 5 * abs(state[4])  # body tilt
+        self.touchdown_flag = bool(state[6] or state[7])
 
         terminated = False
         if self.game_over or abs(state[0]) >= 1.0:

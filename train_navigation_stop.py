@@ -9,6 +9,7 @@ from datetime import datetime
 import gymnasium as gym
 import numpy as np
 import matplotlib.pyplot as plt
+from scripts.lunar_lander_nav import LunarLander_Nav
 
 # Output Settings:
 current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
@@ -139,12 +140,118 @@ class RewardConvergenceCallback(BaseCallback):
 
         return True
 
+class EpisodeCheckpointPlotCallback(BaseCallback):
+    def __init__(
+        self,
+        reward_callback,
+        output_root_dir,
+        checkpoint_every_episodes=4000,
+        smooth_window=20,
+        verbose=0,
+    ):
+        super().__init__(verbose)
+        self.reward_callback = reward_callback
+        self.output_root_dir = output_root_dir
+        self.checkpoint_every_episodes = checkpoint_every_episodes
+        self.smooth_window = smooth_window
+
+        self.last_checkpoint_episode = 0
+
+        os.makedirs(self.output_root_dir, exist_ok=True)
+
+    def _on_step(self) -> bool:
+        dones = self.locals.get("dones", [])
+        if dones is None:
+            return True
+
+        # Count how many envs finished in this rollout step
+        finished_now = int(np.sum(dones))
+
+        if finished_now == 0:
+            return True
+
+        # Total finished episodes tracked from reward callback
+        total_episodes = len(self.reward_callback.episode_idx)
+
+        # Save checkpoint plots every N episodes
+        while total_episodes >= self.last_checkpoint_episode + self.checkpoint_every_episodes:
+            self.last_checkpoint_episode += self.checkpoint_every_episodes
+            self._save_checkpoint_plots(self.last_checkpoint_episode)
+
+        return True
+
+    def _save_checkpoint_plots(self, checkpoint_ep):
+        checkpoint_dir = os.path.join(
+            self.output_root_dir, f"checkpoint_ep_{checkpoint_ep}"
+        )
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        model_path = os.path.join(checkpoint_dir, "model")
+        self.model.save(model_path)
+
+        # =========================
+        # Plot Episode Total Reward x Episode
+        # =========================
+        ep = np.array(self.reward_callback.episode_idx)
+        rew = np.array(self.reward_callback.episode_rewards)
+
+        print(f"=== Saving checkpoint plots at episode {checkpoint_ep} ===")
+        print(f"Total episodes available: {len(ep)}")
+
+        if len(ep) > 0 and len(rew) > 0:
+            rew_s = smooth(rew, window=self.smooth_window)
+            ep_s = ep[len(ep) - len(rew_s):] if len(rew_s) > 0 else np.array([])
+
+            plt.figure()
+            plt.plot(ep, rew, alpha=0.3, label="Raw")
+            if len(rew_s) > 0:
+                plt.plot(ep_s, rew_s, linewidth=2, label="Smoothed")
+            plt.ylim(-400, 350)
+            plt.xlabel("Episode")
+            plt.ylabel("Total Reward")
+            plt.title(f"Training Total Reward vs Episode (up to {checkpoint_ep})")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(
+                os.path.join(checkpoint_dir, "train_total_rew_vs_ep.png"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
+
+        # =========================
+        # Plot Mean Reward x Episode
+        # =========================
+        ep_mean = np.array(self.reward_callback.episode_idx)
+        mean_rew = np.array(self.reward_callback.mean_episode_rewards)
+
+        if len(ep_mean) > 0 and len(mean_rew) > 0:
+            mean_rew_s = smooth(mean_rew, window=self.smooth_window)
+            ep_mean_s = ep_mean[len(ep_mean) - len(mean_rew_s):] if len(mean_rew_s) > 0 else np.array([])
+
+            plt.figure()
+            plt.plot(ep_mean, mean_rew, alpha=0.3, label="Raw")
+            if len(mean_rew_s) > 0:
+                plt.plot(ep_mean_s, mean_rew_s, linewidth=2, label="Smoothed")
+            plt.ylim(-400, 350)
+            plt.xlabel("Episode")
+            plt.ylabel("Mean Reward")
+            plt.title(f"Mean Reward vs Episode (up to {checkpoint_ep})")
+            plt.grid(True)
+            plt.legend()
+            plt.savefig(
+                os.path.join(checkpoint_dir, "train_mean_rew_vs_ep.png"),
+                dpi=300,
+                bbox_inches="tight",
+            )
+            plt.close()
+
 ##================================================================== TRAINING ==================================================================##
 
-env = make_vec_env("LunarLander-v3",n_envs=N_ENV,env_kwargs={"max_episode_steps": 500})
+env = make_vec_env("LunarLander_Nav",n_envs=N_ENV)
 reward_callback = EpisodeRewardCallback(n_envs=N_ENV)
-convergence_callback = RewardConvergenceCallback(n_envs=N_ENV,window_size=1000,tolerance=4.0,patience=5,min_episodes=200,verbose=1,)
-callback_list = CallbackList([reward_callback, convergence_callback])
+checkpoint_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback, output_root_dir=model_dir, checkpoint_every_episodes=1000, smooth_window=20, verbose=1)
+convergence_callback = RewardConvergenceCallback(n_envs=N_ENV,window_size=1000,tolerance=10.0,patience=5,min_episodes=2000,verbose=1,)
+callback_list = CallbackList([reward_callback, convergence_callback, checkpoint_callback])
 
 # Start Training
 start_time = time.time()
@@ -217,7 +324,7 @@ print(f"Training Plots saved on {output_plots_dir}")
 
 ##================================================================== EVALUATION =================================================================##
 # Start Evaluation
-eval_env = gym.make("LunarLander-v3", max_episode_steps=500)
+eval_env = gym.make("LunarLander_Nav")
 n_eval_episodes = 100
 episode_rewards = []
 

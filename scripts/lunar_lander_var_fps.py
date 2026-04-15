@@ -56,7 +56,7 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.0
+FPS_COST = 0.3
 
 navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
 navigation_model = PPO.load(navigation_model_path)
@@ -268,7 +268,7 @@ class LunarLander_VarFramerate(LunarLander):
 
         # SENSOR FRAMERATE SETTINGS:
         self.simulation_fps= FPS
-        self.fps_choices = [1,5,10,25,50]
+        self.fps_choices = [1,5,10,50]
         self.action_space = spaces.Discrete(len(self.fps_choices))
         self.navigation_action_space = spaces.Discrete(4) 
         self.current_obs = None
