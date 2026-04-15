@@ -1,0 +1,137 @@
+Episode 1
+--------------------------------------------------
+steps:                    61
+episode total reward:     -492.928
+episode total nav reward: -492.928
+episode total fps pen:    0.000
+mean total reward/step:   -8.0808
+mean nav reward/step:     -8.0808
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -9.6875
+last 50 mean fps:         1.000
+
+Episode 2
+--------------------------------------------------
+steps:                    151
+episode total reward:     -513.250
+episode total nav reward: -513.250
+episode total fps pen:    0.000
+mean total reward/step:   -3.3990
+mean nav reward/step:     -3.3990
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -8.2040
+last 50 mean fps:         1.000
+
+Episode 3
+--------------------------------------------------
+steps:                    151
+episode total reward:     -558.198
+episode total nav reward: -558.198
+episode total fps pen:    0.000
+mean total reward/step:   -3.6967
+mean nav reward/step:     -3.6967
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -10.3538
+last 50 mean fps:         1.000
+
+Episode 4
+--------------------------------------------------
+steps:                    78
+episode total reward:     -271.328
+episode total nav reward: -271.328
+episode total fps pen:    0.000
+mean total reward/step:   -3.4786
+mean nav reward/step:     -3.4786
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -4.7395
+last 50 mean fps:         1.000
+
+Episode 5
+--------------------------------------------------
+steps:                    87
+episode total reward:     -541.125
+episode total nav reward: -541.125
+episode total fps pen:    0.000
+mean total reward/step:   -6.2198
+mean nav reward/step:     -6.2198
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -9.4912
+last 50 mean fps:         1.000
+
+Episode 6
+--------------------------------------------------
+steps:                    75
+episode total reward:     -105.100
+episode total nav reward: -105.100
+episode total fps pen:    0.000
+mean total reward/step:   -1.4013
+mean nav reward/step:     -1.4013
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -1.4944
+last 50 mean fps:         1.000
+
+Episode 7
+--------------------------------------------------
+steps:                    164
+episode total reward:     -467.697
+episode total nav reward: -467.697
+episode total fps pen:    0.000
+mean total reward/step:   -2.8518
+mean nav reward/step:     -2.8518
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -10.4462
+last 50 mean fps:         1.000
+
+Episode 8
+--------------------------------------------------
+steps:                    78
+episode total reward:     -114.633
+episode total nav reward: -114.633
+episode total fps pen:    0.000
+mean total reward/step:   -1.4697
+mean nav reward/step:     -1.4697
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -1.4904
+last 50 mean fps:         1.000
+
+Episode 9
+--------------------------------------------------
+steps:                    81
+episode total reward:     -31.419
+episode total nav reward: -31.419
+episode total fps pen:    0.000
+mean total reward/step:   -0.3879
+mean nav reward/step:     -0.3879
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  0.2387
+last 50 mean fps:         1.000
+
+Episode 10
+--------------------------------------------------
+steps:                    148
+episode total reward:     -554.828
+episode total nav reward: -554.828
+episode total fps pen:    0.000
+mean total reward/step:   -3.7488
+mean nav reward/step:     -3.7488
+mean fps penalty/step:    0.0000
+mean chosen fps:          1.000
+last 50 mean nav reward:  -10.5365
+last 50 mean fps:         1.000
+
+============================================================
+OVERALL SUMMARY
+============================================================
+mean total reward: -365.051
+mean nav reward:   -365.051
+mean penalty:      0.000
+mean chosen fps:   1.000

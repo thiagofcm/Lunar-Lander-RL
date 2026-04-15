@@ -1,0 +1,9 @@
+===== TRAINING SUMMARY =====
+Type                : Navigation
+Model               : lunar_lander_models\navigation\01-04-2026_12-52-25\ppo-nav.zip
+Mean Reward         : 228.7649688720703
+Std Reward          : 98.66949462890625
+Mean Length         : 197.99899291992188
+Total episodes      : 1000
+Mean Sampled Frames : 39.994998931884766
+Observation Interval: 5 steps

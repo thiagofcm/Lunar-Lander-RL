@@ -1,0 +1,12 @@
+Fixed Sampling FPS Evaluation Summary
+============================================================
+
+n_eval_episodes: 1000
+simulation_fps: 50
+max_episode_steps: 500
+
+FPS= 1 | obs_interval=50 | mean_reward=-457.45 | std_reward=123.32 | mean_steps=67.67 | mean_sampled_frames=2.00
+FPS= 5 | obs_interval=10 | mean_reward=40.00 | std_reward=125.86 | mean_steps=140.89 | mean_sampled_frames=14.53
+FPS=10 | obs_interval= 5 | mean_reward=228.76 | std_reward=98.67 | mean_steps=198.00 | mean_sampled_frames=39.99
+FPS=25 | obs_interval= 2 | mean_reward=284.07 | std_reward=22.29 | mean_steps=209.22 | mean_sampled_frames=104.86
+FPS=50 | obs_interval= 1 | mean_reward=282.62 | std_reward=24.16 | mean_steps=207.61 | mean_sampled_frames=207.61

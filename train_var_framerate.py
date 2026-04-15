@@ -408,10 +408,10 @@ if __name__ == "__main__":
     )
     # Output Settings:
     fps_cost_str =str(FPS_COST).replace('.', '_')
-    fps_choices = [1, 10, 50]
+    fps_choices = [1,5,10,25,50]
 
     current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    model_dir = f"lunar_lander_models/var_framerate_mask_less_options/{current_time}_FPS_{fps_cost_str}"
+    model_dir = f"lunar_lander_models/var_framerate_new_mask_V2/{current_time}_FPS_{fps_cost_str}"
     os.makedirs(model_dir, exist_ok=True)
 
     output_plots_dir = f"{model_dir}/plots"
@@ -428,7 +428,7 @@ if __name__ == "__main__":
     nav_reward_callback = EpisodeNavRewardCallback(n_envs=N_ENV)
     fps_penalty_callback = EpisodeFPSPenaltyCallback(n_envs=N_ENV)
     chosen_fps_callback = EpisodeChosenFPSCallback(n_envs=N_ENV)
-    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=10.0, patience=5, min_episodes=2000, verbose=1)
+    convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=10.0, patience=10, min_episodes=2000, verbose=1)
     checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=1000,smooth_window=20,verbose=1)
     callback_list = CallbackList([reward_callback, nav_reward_callback, fps_penalty_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 

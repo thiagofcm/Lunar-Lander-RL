@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from stable_baselines3 import PPO
 import gymnasium as gym
 import sys
+from gymnasium.wrappers import TimeLimit
+import scripts.lunar_lander_nav as lunar_lander_nav
 
 # ============================================================
 # Helpers
@@ -28,24 +30,6 @@ def evaluate_fixed_sampling_fps(
     output_root="eval_fixed_sampling",
     render_mode=None,
 ):
-    """
-    Evaluate a navigation model under fixed observation sampling rates.
-
-    The environment physics runs every step, but the observation given to the
-    navigation policy is only refreshed every obs_interval steps.
-
-    Args:
-        model: trained navigation model with model.predict(obs, deterministic=True)
-        fps_choices: iterable of fixed sampling FPS values to test
-        n_eval_episodes: number of episodes per FPS
-        simulation_fps: base simulation frequency of LunarLander loop
-        max_episode_steps: episode cap
-        output_root: root folder where plots/results will be saved
-        render_mode: e.g. "human" or None
-
-    Returns:
-        summary_results: dict with per-FPS metrics
-    """
     timestamp = time.strftime("%d-%m-%Y_%H-%M-%S")
     output_dir = os.path.join(output_root, f"fixed_sampling_eval_{timestamp}")
     os.makedirs(output_dir, exist_ok=True)
@@ -67,10 +51,17 @@ def evaluate_fixed_sampling_fps(
         print(f"Evaluating fixed sampling FPS = {fixed_fps} | obs_interval = {obs_interval}")
         print("=" * 70)
 
-        eval_env = gym.make("LunarLander-v3", max_episode_steps=max_episode_steps, render_mode=render_mode)
+        eval_env = gym.make(
+            "LunarLander_Nav",
+            #max_episode_steps=max_episode_steps,
+            render_mode=render_mode
+        )
+
+        eval_env = TimeLimit(eval_env, max_episode_steps=max_episode_steps)
 
         episode_rewards = []
         episode_lengths = []
+        all_step_rewards = []
         sampled_frames_per_episode = []
 
         for ep in range(n_eval_episodes):
@@ -79,13 +70,12 @@ def evaluate_fixed_sampling_fps(
             truncated = False
             total_reward = 0.0
             step_count = 0
+            step_rewards = []
 
-            # Initial sampled observation
             sampled_obs = np.array(obs, dtype=np.float32).copy()
             sampled_frames = 1  # count reset sample as first available frame
 
             while not (done or truncated):
-                # Refresh observation only every obs_interval steps
                 if step_count % obs_interval == 0:
                     sampled_obs = np.array(obs, dtype=np.float32).copy()
                     if step_count > 0:
@@ -94,12 +84,15 @@ def evaluate_fixed_sampling_fps(
                 action, _ = model.predict(sampled_obs, deterministic=True)
 
                 obs, reward, done, truncated, info = eval_env.step(action)
+                step_rewards.append(reward)
                 total_reward += reward
                 step_count += 1
 
+            # Record episode metrics
             episode_rewards.append(total_reward)
             episode_lengths.append(step_count)
             sampled_frames_per_episode.append(sampled_frames)
+            all_step_rewards.append(step_rewards)
 
             print(
                 f"FPS {fixed_fps:>2} | Episode {ep+1:>3}/{n_eval_episodes} | "
@@ -119,6 +112,15 @@ def evaluate_fixed_sampling_fps(
         mean_length = float(np.mean(lengths_arr))
         mean_sampled = float(np.mean(sampled_arr))
 
+        # Mean step reward across episodes
+        max_len = max(len(r) for r in all_step_rewards)
+        reward_matrix = np.full((len(all_step_rewards), max_len), np.nan, dtype=np.float32)
+
+        for i, r in enumerate(all_step_rewards):
+            reward_matrix[i, :len(r)] = r
+
+        mean_step_reward = np.nanmean(reward_matrix, axis=0)
+
         summary_results[fixed_fps] = {
             "episode_rewards": episode_rewards,
             "episode_lengths": episode_lengths,
@@ -128,6 +130,7 @@ def evaluate_fixed_sampling_fps(
             "mean_length": mean_length,
             "mean_sampled_frames": mean_sampled,
             "obs_interval": obs_interval,
+            "mean_step_reward": mean_step_reward,
         }
 
         with open(log_file, "w") as f:
@@ -193,47 +196,81 @@ def evaluate_fixed_sampling_fps(
         plt.close()
 
         # ------------------------------------------------------------
+        # Plot 3: Mean step reward across episodes
+        # ------------------------------------------------------------
+        plt.figure()
+        plt.plot(mean_step_reward)
+        plt.xlabel("Timestep")
+        plt.ylabel("Mean Reward")
+        plt.title(f"Mean Step Reward | Fixed Sampling FPS = {fixed_fps}")
+        plt.grid(True)
+        plt.savefig(
+            os.path.join(fps_dir, f"mean_step_reward_fps_{fixed_fps}.png"),
+            dpi=300,
+            bbox_inches="tight",
+        )
+        plt.close()
+
+        # ------------------------------------------------------------
         # Save raw arrays
         # ------------------------------------------------------------
-        np.save(os.path.join(fps_dir, f"episode_rewards_fps_{fixed_fps}.npy"), rewards_arr)
-        np.save(os.path.join(fps_dir, f"episode_lengths_fps_{fixed_fps}.npy"), lengths_arr)
-        np.save(os.path.join(fps_dir, f"sampled_frames_fps_{fixed_fps}.npy"), sampled_arr)
+        # np.save(os.path.join(fps_dir, f"episode_rewards_fps_{fixed_fps}.npy"), rewards_arr)
+        # np.save(os.path.join(fps_dir, f"episode_lengths_fps_{fixed_fps}.npy"), lengths_arr)
+        # np.save(os.path.join(fps_dir, f"sampled_frames_fps_{fixed_fps}.npy"), sampled_arr)
+        # np.save(os.path.join(fps_dir, f"mean_step_reward_fps_{fixed_fps}.npy"), mean_step_reward)
+        # np.save(os.path.join(fps_dir, f"step_rewards_matrix_fps_{fixed_fps}.npy"), reward_matrix)
 
-    # ============================================================
-    # Combined comparison plots
-    # ============================================================
+    # # ============================================================
+    # # Combined comparison plots
+    # # ============================================================
     tested_fps = list(summary_results.keys())
-    mean_rewards = [summary_results[f]["mean_reward"] for f in tested_fps]
-    std_rewards = [summary_results[f]["std_reward"] for f in tested_fps]
-    mean_sampled_frames = [summary_results[f]["mean_sampled_frames"] for f in tested_fps]
+    # mean_rewards = [summary_results[f]["mean_reward"] for f in tested_fps]
+    # std_rewards = [summary_results[f]["std_reward"] for f in tested_fps]
+    # mean_sampled_frames = [summary_results[f]["mean_sampled_frames"] for f in tested_fps]
 
-    # Combined plot: mean reward vs fixed FPS
-    plt.figure()
-    plt.plot(tested_fps, mean_rewards, marker="o")
-    plt.xlabel("Fixed Sampling FPS")
-    plt.ylabel("Mean Episode Reward")
-    plt.title("Mean Reward vs Fixed Sampling FPS")
-    plt.grid(True)
-    plt.savefig(
-        os.path.join(output_dir, "mean_reward_vs_fixed_fps.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
+    # # Combined plot: mean reward vs fixed FPS
+    # plt.figure()
+    # plt.plot(tested_fps, mean_rewards, marker="o")
+    # plt.xlabel("Fixed Sampling FPS")
+    # plt.ylabel("Mean Episode Reward")
+    # plt.title("Mean Reward vs Fixed Sampling FPS")
+    # plt.grid(True)
+    # plt.savefig(
+    #     os.path.join(output_dir, "mean_reward_vs_fixed_fps.png"),
+    #     dpi=300,
+    #     bbox_inches="tight",
+    # )
+    # plt.close()
 
-    # Combined plot: mean sampled frames vs fixed FPS
-    plt.figure()
-    plt.plot(tested_fps, mean_sampled_frames, marker="o")
-    plt.xlabel("Fixed Sampling FPS")
-    plt.ylabel("Mean Sampled Frames per Episode")
-    plt.title("Mean Sampled Frames vs Fixed Sampling FPS")
-    plt.grid(True)
-    plt.savefig(
-        os.path.join(output_dir, "mean_sampled_frames_vs_fixed_fps.png"),
-        dpi=300,
-        bbox_inches="tight",
-    )
-    plt.close()
+    # # Combined plot: mean sampled frames vs fixed FPS
+    # plt.figure()
+    # plt.plot(tested_fps, mean_sampled_frames, marker="o")
+    # plt.xlabel("Fixed Sampling FPS")
+    # plt.ylabel("Mean Sampled Frames per Episode")
+    # plt.title("Mean Sampled Frames vs Fixed Sampling FPS")
+    # plt.grid(True)
+    # plt.savefig(
+    #     os.path.join(output_dir, "mean_sampled_frames_vs_fixed_fps.png"),
+    #     dpi=300,
+    #     bbox_inches="tight",
+    # )
+    # plt.close()
+
+    # # Combined plot: mean step reward comparison
+    # plt.figure()
+    # for fps in tested_fps:
+    #     plt.plot(summary_results[fps]["mean_step_reward"], label=f"FPS {fps}")
+    # plt.xlabel("Timestep")
+    # plt.ylabel("Mean Reward")
+    # plt.title("Mean Step Reward Comparison Across Fixed FPS")
+    # plt.grid(True)
+    # plt.legend()
+    # plt.savefig(
+    #     os.path.join(output_dir, "mean_step_reward_comparison.png"),
+    #     dpi=300,
+    #     bbox_inches="tight",
+    # )
+    # plt.close()
 
     # Save summary text
     summary_txt = os.path.join(output_dir, "summary.txt")
@@ -256,7 +293,6 @@ def evaluate_fixed_sampling_fps(
     print(f"\nAll evaluation plots and results saved in:\n{output_dir}")
     return summary_results
 
-
 if __name__ == "__main__":
 
     model_str = sys.argv[1]
@@ -267,7 +303,7 @@ if __name__ == "__main__":
         model=model,
         model_str=model_str,
         fps_choices=(1, 5, 10, 25, 50),
-        n_eval_episodes=1000,
+        n_eval_episodes=100,
         simulation_fps=50,
         max_episode_steps=500,
         #output_root=output_plots_dir,

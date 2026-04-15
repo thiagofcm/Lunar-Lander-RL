@@ -56,8 +56,7 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.6
-ACTION_FPS = 25
+FPS_COST = 0.0
 
 navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
 navigation_model = PPO.load(navigation_model_path)
@@ -253,7 +252,7 @@ class LunarLander_VarFramerate(LunarLander):
             )
         self.turbulence_power = turbulence_power
 
-        self.enable_wind = enable_wind
+        self.enable_wind = False
 
         self.screen: pygame.Surface = None
         self.clock = None
@@ -269,26 +268,24 @@ class LunarLander_VarFramerate(LunarLander):
 
         # SENSOR FRAMERATE SETTINGS:
         self.simulation_fps= FPS
-        self.fps_choices = [1,50]
+        self.fps_choices = [1,5,10,25,50]
         self.action_space = spaces.Discrete(len(self.fps_choices))
         self.navigation_action_space = spaces.Discrete(4) 
         self.current_obs = None
-        self.episode_count = 0
         self.world_step_count = 0
         self.last_sampled_obs = None
         self.steps_since_last_obs = 0
-        self.current_fps = 1
+        self.current_fps = 50
         self.acc_nav_reward = 0
-        self.acc_fps_penalty = 0
-        self.acc_fps_value  = 0
-        self.action_interval = self.fps_choices[0]
         self.obs_interval = 1
-        self.ep_action_dif_cost = 0
 
-        # NEW APPROACH:
+        # MASK AND PADDING SETTINGS:
         self.obs_seq_len = 8
-        self.single_obs_dim = 18 # 8 original obs + 8 mask + 2 mask values
+        self.single_obs_dim = 10 # 8 original obs + 8 mask + 2 mask values
         self.obs_buffer = deque(maxlen=self.obs_seq_len)
+
+        # DEBBUGING MASK
+        self.mask_buffer = deque(maxlen=self.obs_seq_len)
 
         low_single = np.array(
             [
@@ -307,7 +304,7 @@ class LunarLander_VarFramerate(LunarLander):
                 0.0,   # right leg contact
 
                 # observation mask (8)
-                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                #0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 
                 0.0,  # obs age ratio lower bound
                 0.0   # fps ratio lower bound
@@ -330,7 +327,7 @@ class LunarLander_VarFramerate(LunarLander):
                 1.0,   # right leg contact
 
                 # observation mask (8)
-                1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+                #1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
                 
                 # extras (2)
                 1.0,   # obs age ratio
@@ -506,45 +503,52 @@ class LunarLander_VarFramerate(LunarLander):
         if self.render_mode == "human":
             self.render()
         
+        # Clear the buffer of observations of size: lenght: seq_obs_len
         self.obs_buffer.clear()
+        # Step the world with 0 action to get the initial observation
         obs, _, _, _, _ = self._physics_step(0)
+
+        # Updates the current observation, last sampled observation, current fps, obs interval, and steps since last observation
         self.current_obs = np.array(obs, dtype=np.float32)
         self.last_sampled_obs = np.array(obs, dtype=np.float32)
         self.current_fps = self.fps_choices[-1]
         self.obs_interval = int(self.simulation_fps/self.current_fps)
-        self.action_interval = self.obs_interval
         self.steps_since_last_obs = 0
 
+        # Copy the oservation values to a new variable, and augment it with the mask and extra info (age ratio and fps ratio)
         obs_values = self.last_sampled_obs.copy()
-        obs_mask = np.ones_like(self.last_sampled_obs, dtype=np.float32)
-
-        aug_obs = self._get_augmented_obs(obs_values, obs_mask)
+        aug_obs = self._get_augmented_obs(obs_values)
 
         for _ in range(self.obs_seq_len):
             self.obs_buffer.append(aug_obs.copy())
-        
+            # Create the debugging observation mask, which indicates which values in the observation are valid (1 for valid, 0 for invalid)
+            self.mask_buffer.append(np.ones_like(self.last_sampled_obs, dtype=np.float32))
+
+        # Counts the number of frames that were actually acquired
         self.episode_frame_count = 1
 
-        new_obs = self._get_sequence_obs()
+        # Get the variable from the buffer and return it as the initial observation
+        reset_obs = self._get_sequence_obs()
         
-        #print(f"Initial observation on RESET: {new_obs}")
-        #print(f"Augmented observation shape on RESET: {new_obs.shape}")
+        # DEBUGGING PRINTS:
+        #print(f"Initial observation on RESET: {reset_obs}")
+        #print(f"Augmented observation shape on RESET: {reset_obs.shape}")
         
         # print("=" * 80)
         # print("RESET")
 
-        # for i in range(new_obs.shape[0]):
-        #     obs_vals = new_obs[i, :8]
-        #     obs_mask = new_obs[i, 8:16]
-        #     extras = new_obs[i, 16:]
+        # for i in range(reset_obs.shape[0]):
+        #     obs_vals = reset_obs[i, :8]
+        #     extras = reset_obs[i, 8:10]
+        #     mask_vals = self.mask_buffer[i]
 
         #     print(f"[timestep {i}]")
         #     print(f"  obs:   {obs_vals}")
-        #     print(f"  mask:  {obs_mask}  (sum={obs_mask.sum()})")
+        #     print(f"  mask:  {mask_vals}  (sum={mask_vals.sum()})") 
         #     print(f"  extra: age={extras[0]:.3f}, fps={extras[1]:.3f}")
         #     print("-" * 40)
                 
-        return new_obs, {}
+        return reset_obs, {}
 
     def _create_particle(self, mass, x, y, ttl):
         p = self.world.CreateDynamicBody(
@@ -765,7 +769,7 @@ class LunarLander_VarFramerate(LunarLander):
         # truncation=False as the time limit is handled by the `TimeLimit` wrapper added during `make`
         return np.array(state, dtype=np.float32), reward, terminated, False, {}
         
-    def _get_augmented_obs(self, obs_values, obs_mask):
+    def _get_augmented_obs(self, obs_values):
         obs_age_steps = self.steps_since_last_obs
         # normalizing the num of steps since last obs
         obs_age_ratio = obs_age_steps / self.simulation_fps
@@ -774,64 +778,143 @@ class LunarLander_VarFramerate(LunarLander):
 
         aug_obs = np.concatenate([
             obs_values.astype(np.float32),
-            obs_mask.astype(np.float32),
             np.array([obs_age_ratio,fps_ratio], dtype=np.float32)])
 
         return aug_obs
+        
+    def get_stale_obs(self):
+
+        def safe_hover_template():
+            return np.array([
+                self.np_random.uniform(-0.1, 0.1),   # x ~ centered
+                self.np_random.uniform(0.2, 0.4),    # moderate height
+                self.np_random.uniform(-0.05, 0.05), # vx small
+                self.np_random.uniform(-0.05, 0.05), # vy small
+                self.np_random.uniform(-0.05, 0.05), # near upright
+                self.np_random.uniform(-0.05, 0.05), # low angular vel
+                0.0,
+                0.0
+            ], dtype=np.float32)
+
+        def safe_slow_descent():
+            return np.array([
+                self.np_random.uniform(-0.1, 0.1),
+                self.np_random.uniform(0.15, 0.35),
+                self.np_random.uniform(-0.05, 0.05),
+                self.np_random.uniform(-0.1, -0.02),  # small downward velocity
+                self.np_random.uniform(-0.05, 0.05),
+                self.np_random.uniform(-0.05, 0.05),
+                0.0,
+                0.0
+            ], dtype=np.float32)
+
+        def safe_hidden_drift():
+            return np.array([
+                self.np_random.uniform(-0.05, 0.05),  # looks centered
+                self.np_random.uniform(0.2, 0.4),
+                0.0,                       # vx erased
+                self.np_random.uniform(-0.05, 0.05),
+                self.np_random.uniform(-0.05, 0.05),
+                0.0,
+                0.0,
+                0.0
+            ], dtype=np.float32)
+        
+        def safe_rotation_hidden():
+            return np.array([
+                self.np_random.uniform(-0.1, 0.1),
+                self.np_random.uniform(0.2, 0.4),
+                self.np_random.uniform(-0.05, 0.05),
+                self.np_random.uniform(-0.05, 0.05),
+                0.0,                        # angle hidden
+                0.0,                        # angular velocity hidden
+                0.0,
+                0.0
+            ], dtype=np.float32)
+        
+        templates = [
+            safe_hover_template,
+            safe_slow_descent,
+            safe_hidden_drift,
+            safe_rotation_hidden
+        ]
+
+        idx = self.np_random.integers(len(templates))
+        return templates[idx]() 
 
     def step(self, action):
+        # Increment the world step count
         self.world_step_count += 1
-        # print(self.world_step_count)
 
-        # Use the currently available sampled observation to compute control
+        # Increment the steps since last observation count
+        self.steps_since_last_obs += 1
+
+        # Use the currently available sampled observation to compute navigation action
         navigation_action, _ = navigation_model.predict(self.last_sampled_obs, deterministic=True)
 
+        # Perform a physics step in the environment using the navigation action,
+        # and get the new observation, navigation reward, termination status, truncation status, and info
         obs, nav_reward, terminated, truncated, info = self._physics_step(navigation_action)
         
+        # Compute the FPS penalty based on the current FPS and the simulation FPS
         fps_penalty = (FPS_COST * (self.current_fps / self.simulation_fps))
         reward = nav_reward - fps_penalty
         
-        # Save FPS used for reward (old FPS)
-        fps_used_for_reward = self.current_fps
-
+        # Update the current observation with the new observation obtained from the physics step
         self.current_obs = obs.copy()
 
-        if self.steps_since_last_obs + 1 >= self.obs_interval:
+        # Check if it's time to sample a new observation based on the obs_interval
+        # If so, update the last sampled observation, reset the steps since last observation count, and increment the episode frame count
+        if self.steps_since_last_obs >= self.obs_interval:
+            # self.current_obs is updated every physics step, so here we store the fresh observation of this step
             self.last_sampled_obs = self.current_obs.copy()
-            # self.current_obs is updated every physics step,
-            # so here we store the fresh observation of this step
             self.steps_since_last_obs = 0
             self.episode_frame_count += 1
 
+            # Update FPS and obs_interval based on the action taken by the agent
+            # the action is chosen at a sampling instant and affects future sampling
             self.current_fps = self.fps_choices[int(action)]
             self.obs_interval = int(self.simulation_fps / self.current_fps)
-            # the action is chosen at a sampling instant and affects future sampling
-            self.action_interval = self.obs_interval
-            obs_values = self.last_sampled_obs.copy()
+            
+            # Debbuging mask, which indicates which values in the observation are valid (1 for valid, 0 for invalid)
             obs_mask = np.ones_like(self.last_sampled_obs, dtype=np.float32)
-        else:
-            self.steps_since_last_obs += 1
+
+            # Copy the last sampled observation to a new variable, 
+            # which will be used for augmentation and storing in the buffer
             obs_values = self.last_sampled_obs.copy()
+
+        else:
+            # If it's not time to sample a new observation, we use the last sampled
+            # observation (self.last_sampled_obs is not updated)
+            # get_stale_obs() generates a random observation to simulate the staleness and uncertainty of not having a fresh observation.
+            obs_values = self.get_stale_obs()
+
+            # Debbuging mask, which indicates which values in the observation are valid (1 for valid, 0 for invalid)
             obs_mask = np.zeros_like(self.last_sampled_obs, dtype=np.float32)
-    
-        aug_obs = self._get_augmented_obs(obs_values, obs_mask)
+
+        # DEBBGING: store the observation mask in a separate buffer for analysis
+        self.mask_buffer.append(obs_mask.copy())
+
+        # Adds extra info (age ratio and fps ratio), and appends it to the observation buffer
+        aug_obs = self._get_augmented_obs(obs_values)
         self.obs_buffer.append(aug_obs.copy())
 
         new_obs = self._get_sequence_obs()
+        
         #print(f"Observation on STEP: {new_obs}")
 
 
-        #print("=" * 80)
-        #print("STEP")
+        # print("=" * 80)
+        # print("STEP")
 
         # for i in range(new_obs.shape[0]):
         #     obs_vals = new_obs[i, :8]
-        #     obs_mask = new_obs[i, 8:16]
-        #     extras = new_obs[i, 16:]
+        #     extras = new_obs[i, 8:10]
+        #     mask_vals = self.mask_buffer[i]
 
         #     print(f"[timestep {i}]")
         #     print(f"  obs:   {obs_vals}")
-        #     print(f"  mask:  {obs_mask}  (sum={obs_mask.sum()})")
+        #     print(f"  mask:  {mask_vals}  (sum={mask_vals.sum()})")
         #     print(f"  extra: age_ratio={extras[0]:.3f}, fps_ratio={extras[1]:.3f}")
         #     print("-" * 40)
 
