@@ -5,17 +5,24 @@ import gymnasium as gym
 from stable_baselines3 import PPO
 import sys
 
-def analyze_touchdown_velocities(model, n_eval_episodes=500, render_mode=None):
+def analyze_touchdown_velocities(model, n_eval_episodes=500, fixed_fps=10, simulation_fps=50, render_mode=None, model_str=""):
+    seeds = list(range(n_eval_episodes))  # use n_eval_episodes not hardcoded 500
     env = gym.make("LunarLander-v3", render_mode=render_mode)
+    obs_interval = int(simulation_fps / fixed_fps)
     touchdown_data = []
 
-    for ep in range(n_eval_episodes):
-        obs, _ = env.reset()
+    for ep, seed in enumerate(seeds):
+        obs, _ = env.reset(seed=seed)  # pass seed here ✅
         done, truncated = False, False
         landed = False
+        step_count = 0
+        sampled_obs = obs.copy()
 
         while not (done or truncated):
-            action, _ = model.predict(obs, deterministic=True)
+            if step_count % obs_interval == 0:
+                sampled_obs = obs.copy()
+
+            action, _ = model.predict(sampled_obs, deterministic=True)
             obs, reward, done, truncated, info = env.step(action)
 
             if (obs[6] or obs[7]) and not landed:
@@ -25,6 +32,7 @@ def analyze_touchdown_velocities(model, n_eval_episodes=500, render_mode=None):
                     "tilt": abs(obs[4]),
                 })
                 landed = True
+            step_count += 1
 
         if (ep + 1) % 50 == 0:
             print(f"Episode {ep+1}/{n_eval_episodes} done")
@@ -62,8 +70,8 @@ def analyze_touchdown_velocities(model, n_eval_episodes=500, render_mode=None):
 
     plt.suptitle("Touchdown Analysis", fontsize=14)
     plt.tight_layout()
-    plt.savefig("touchdown_analysis.png", dpi=300, bbox_inches="tight")
-    plt.show()
+    plt.savefig(f"touchdown_analysis_{model_str}_{fixed_fps}.png", dpi=300, bbox_inches="tight")
+    #plt.show()
     print("\nPlot saved to touchdown_analysis.png")
 
     return df
@@ -73,5 +81,8 @@ if __name__ == "__main__":
     model_str = sys.argv[1]
     model = PPO.load(model_str)
     print(f"Model loaded: {model_str}")
+    date_str = model_str.split("\\")[-2].split("_")[0][:5] 
 
-    df = analyze_touchdown_velocities(model, n_eval_episodes=500)
+    for fps in [50, 25, 10, 5, 1]:
+        print(f"\n===== FPS = {fps} =====")
+        df = analyze_touchdown_velocities(model, fixed_fps=fps, model_str=date_str)

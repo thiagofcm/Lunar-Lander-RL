@@ -1,0 +1,6 @@
+===== Comparison Summary =====
+Variable FPS         | Mean: 155.21 ± 94.20 | N=1000
+Fixed 1 FPS          | Mean: -626.73 ± 348.78 | N=1000
+Fixed 5 FPS          | Mean: -179.74 ± 221.86 | N=1000
+Fixed 10 FPS         | Mean: 139.57 ± 96.49 | N=1000
+Fixed 25 FPS         | Mean: 151.22 ± 27.28 | N=1000

@@ -32,7 +32,7 @@ class RewardCallback(BaseCallback):
 if __name__ == "__main__":
     model_str = sys.argv[1]
 
-    output_dir = f"demos/navigation/gif_outputs_criteria_{os.path.basename(model_str).split('.zip')[0]}"
+    output_dir = f"demos/navigation/gif_outputs_{model_str.split('\\')[-2].split('_')[0][:5]}"
     os.makedirs(output_dir, exist_ok=True)
 
     # Start Evaluation
@@ -42,12 +42,13 @@ if __name__ == "__main__":
     n_gif_episodes = 2
     gif_fps = 50
     episode_rewards = []
+    seeds = list(range(n_eval_episodes))
 
     model = PPO.load(model_str)
     print(f"Model Loaded: {model_str}")
 
-    for ep in range(n_eval_episodes):
-        obs, _ = eval_env.reset()
+    for ep, seed in enumerate(seeds):
+        obs, _ = eval_env.reset(seed=seed)
         done = False
         truncated = False
         total_reward = 0.0

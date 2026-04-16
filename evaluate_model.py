@@ -14,15 +14,15 @@ from gymnasium.wrappers import TimeLimit
 # Your custom env
 import scripts.lunar_lander_var_fps as lunar_lander_var_fps
 from scripts.lunar_lander_var_fps import navigation_model_path
-from scripts.lunar_lander_var_fps import FPS_COST
-
 
 # =========================
 # USER INPUT (ONLY CHANGE THESE)
 # =========================
-MODEL_PATH = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo-nav.zip"
-OUTPUT_DIR = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\plots_eval"
+MODEL_PATH = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_09-01-55_FPS_0_6\\plots\\checkpoint_ep_16000\\model.zip"
+OUTPUT_DIR = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_09-01-55_FPS_0_6\\plots\\checkpoint_ep_16000\\eval_plots"
 
+FPS_COST = MODEL_PATH.split("FPS_")[-1].split("\\")[0]
+print(f"Evaluating model with frame cost: {FPS_COST}")
 
 # =========================
 # Utils

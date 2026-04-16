@@ -56,9 +56,8 @@ MAIN_ENGINE_Y_LOCATION = (
 
 VIEWPORT_W = 600
 VIEWPORT_H = 400
-FPS_COST = 0.3
 
-navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip"
+navigation_model_path = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo-nav.zip"
 navigation_model = PPO.load(navigation_model_path)
 
 
@@ -224,6 +223,7 @@ class LunarLander_VarFramerate(LunarLander):
         enable_wind: bool = False,
         wind_power: float = 15.0,
         turbulence_power: float = 1.5,
+        frame_cost: float = 0.0,
     ):
         EzPickle.__init__(
             self,
@@ -268,7 +268,7 @@ class LunarLander_VarFramerate(LunarLander):
 
         # SENSOR FRAMERATE SETTINGS:
         self.simulation_fps= FPS
-        self.fps_choices = [1,5,10,50]
+        self.fps_choices = [1,5,10,25]
         self.action_space = spaces.Discrete(len(self.fps_choices))
         self.navigation_action_space = spaces.Discrete(4) 
         self.current_obs = None
@@ -278,6 +278,8 @@ class LunarLander_VarFramerate(LunarLander):
         self.current_fps = 50
         self.acc_nav_reward = 0
         self.obs_interval = 1
+        self.fps_penalty = 0.0
+        self.frame_cost = frame_cost
 
         # MASK AND PADDING SETTINGS:
         self.obs_seq_len = 8
@@ -385,6 +387,8 @@ class LunarLander_VarFramerate(LunarLander):
 
         self._destroy()
         self.world_step_count = 0
+        self.touchdown_flag = False
+        self.fps_penalty = 0.0
         # Bug's workaround for: https://github.com/Farama-Foundation/Gymnasium/issues/728
         # Not sure why the self._destroy() is not enough to clean(reset) the total world environment elements, need more investigation on the root cause,
         # we must create a totally new world for self.reset(), or the bug#728 will happen
@@ -613,9 +617,9 @@ class LunarLander_VarFramerate(LunarLander):
         if self.continuous:
             action = np.clip(action, -1, +1).astype(np.float64)
         else:
-            assert self.navigation_action_space.contains(action), (
-                f"{action!r} ({type(action)}) invalid "
-            )
+            assert self.navigation_action_space.contains(
+                action
+            ), f"{action!r} ({type(action)}) invalid "
 
         # Apply Engine Impulses
 
@@ -755,6 +759,14 @@ class LunarLander_VarFramerate(LunarLander):
         )  # less fuel spent is better, about -30 for heuristic landing
         reward -= s_power * 0.03
 
+        # --- Smooth landing penalty ---
+        touchdown_check = (state[6] or state[7]) and not self.touchdown_flag
+        if touchdown_check:
+            reward -= 400 * abs(state[3])  # vertical velocity
+            #reward -= 5 * abs(state[2])  # horizontal velocity
+            #reward -= 5 * abs(state[4])  # body tilt
+        self.touchdown_flag = bool(state[6] or state[7])
+
         terminated = False
         if self.game_over or abs(state[0]) >= 1.0:
             terminated = True
@@ -765,7 +777,6 @@ class LunarLander_VarFramerate(LunarLander):
 
         if self.render_mode == "human":
             self.render()
-
         # truncation=False as the time limit is handled by the `TimeLimit` wrapper added during `make`
         return np.array(state, dtype=np.float32), reward, terminated, False, {}
         
@@ -849,6 +860,8 @@ class LunarLander_VarFramerate(LunarLander):
         # Increment the steps since last observation count
         self.steps_since_last_obs += 1
 
+        frame_consumed = (self.steps_since_last_obs == 1)
+
         # Use the currently available sampled observation to compute navigation action
         navigation_action, _ = navigation_model.predict(self.last_sampled_obs, deterministic=True)
 
@@ -857,9 +870,11 @@ class LunarLander_VarFramerate(LunarLander):
         obs, nav_reward, terminated, truncated, info = self._physics_step(navigation_action)
         
         # Compute the FPS penalty based on the current FPS and the simulation FPS
-        fps_penalty = (FPS_COST * (self.current_fps / self.simulation_fps))
-        reward = nav_reward - fps_penalty
-        
+        frame_penalty = self.frame_cost if frame_consumed else 0.0
+        reward = nav_reward - frame_penalty
+
+        self.fps_penalty += frame_penalty
+
         # Update the current observation with the new observation obtained from the physics step
         self.current_obs = obs.copy()
 
@@ -923,7 +938,7 @@ class LunarLander_VarFramerate(LunarLander):
         info["chosen_fps"] = self.current_fps
         info["episode_frame_count"] = self.episode_frame_count
         info["nav_reward"] = nav_reward
-        info["fps_penalty"] = fps_penalty
+        info["fps_penalty"] = self.fps_penalty
         info["reward"] = reward
         info["timeout"] = truncated and not terminated
 
