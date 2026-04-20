@@ -446,7 +446,7 @@ if __name__ == "__main__":
     )
     N_ENV = 16
 
-    frame_cost_grid = [0.6, 0.0, 0.7, 0.5, 0.4]
+    frame_cost_grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 3.0]
 
     for frame_cost in frame_cost_grid:
 
@@ -456,7 +456,7 @@ if __name__ == "__main__":
         fps_choices = [1,5,10,25]
 
         current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        model_dir = f"lunar_lander_models/var_framerate_per_frame_penalty/{current_time}_FPS_{frame_cost_str}"
+        model_dir = f"lunar_lander_models/var_framerate_per_frame_penalty_wo_landing_penalty/{current_time}_FPS_{frame_cost_str}"
         os.makedirs(model_dir, exist_ok=True)
 
         output_plots_dir = f"{model_dir}/plots"

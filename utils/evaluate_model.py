@@ -18,8 +18,8 @@ from scripts.lunar_lander_var_fps import navigation_model_path
 # =========================
 # USER INPUT (ONLY CHANGE THESE)
 # =========================
-MODEL_PATH = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_09-01-55_FPS_0_6\\plots\\checkpoint_ep_16000\\model.zip"
-OUTPUT_DIR = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_09-01-55_FPS_0_6\\plots\\checkpoint_ep_16000\\eval_plots"
+MODEL_PATH = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_10-27-07_FPS_0_0\\plots\\checkpoint_ep_42000\\model.zip"
+OUTPUT_DIR = "lunar_lander_models\\var_framerate_per_frame_penalty\\16-04-2026_10-27-07_FPS_0_0\\plots\\checkpoint_ep_42000"
 
 FPS_COST = MODEL_PATH.split("FPS_")[-1].split("\\")[0]
 print(f"Evaluating model with frame cost: {FPS_COST}")

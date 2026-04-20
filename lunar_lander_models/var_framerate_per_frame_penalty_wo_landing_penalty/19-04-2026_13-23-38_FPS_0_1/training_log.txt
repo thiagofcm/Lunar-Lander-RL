@@ -1,0 +1,8 @@
+===== TRAINING SUMMARY =====
+Type                  : Var Framerate
+Trained Model         : lunar_lander_models/var_framerate_per_frame_penalty_wo_landing_penalty/19-04-2026_13-23-38_FPS_0_1/ppo_var_frame_cost_0_1
+Navigation Model used : lunar_lander_models\navigation\15-04-2026_17-00-41\ppo-nav.zip
+Total timesteps       : 14975200
+Total episodes        : 66000
+Possible FPS actions  : [1, 5, 10, 25]
+Training time (min)   : 323.16

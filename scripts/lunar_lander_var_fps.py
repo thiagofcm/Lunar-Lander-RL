@@ -762,7 +762,7 @@ class LunarLander_VarFramerate(LunarLander):
         # --- Smooth landing penalty ---
         touchdown_check = (state[6] or state[7]) and not self.touchdown_flag
         if touchdown_check:
-            reward -= 400 * abs(state[3])  # vertical velocity
+            reward -= 0 * abs(state[3])  # vertical velocity
             #reward -= 5 * abs(state[2])  # horizontal velocity
             #reward -= 5 * abs(state[4])  # body tilt
         self.touchdown_flag = bool(state[6] or state[7])

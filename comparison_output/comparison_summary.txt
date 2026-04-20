@@ -1,0 +1,8 @@
+===== Comparison Summary =====
+Frame Cost: 0.6 | Runs: 10 | Episodes per run: 100
+
+Variable FPS         | Reward:  154.99 ±  98.40 | Frames:   59.8 ±  11.7
+Fixed 1 FPS          | Reward: -594.90 ± 331.08 | Frames:    3.1 ±   0.6
+Fixed 5 FPS          | Reward: -191.95 ± 225.19 | Frames:   18.9 ±   8.7
+Fixed 10 FPS         | Reward:  134.64 ± 104.24 | Frames:   47.5 ±   9.3
+Fixed 25 FPS         | Reward:  149.96 ±  32.99 | Frames:  120.5 ±  11.5
