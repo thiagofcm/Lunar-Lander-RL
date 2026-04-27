@@ -6,8 +6,8 @@ from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.callbacks import CallbackList
 from gymnasium.wrappers import TimeLimit
 import gymnasium as gym
-import scripts.lunar_lander_var_fps as lunar_lander_var_fps
-from scripts.lunar_lander_var_fps import navigation_model_path
+import scripts.lunar_lander_var_fps_temp_padd as lunar_lander_var_fps
+from scripts.lunar_lander_var_fps_temp_padd import LANDING_PENALTY, navigation_model_path
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -90,7 +90,7 @@ class EpisodeCheckpointPlotCallback(BaseCallback):
             plt.plot(ep, rew, alpha=0.3, label="Raw")
             if len(rew_s) > 0:
                 plt.plot(ep_s, rew_s, linewidth=2, label="Smoothed")
-            plt.ylim(-400, 350)
+            plt.ylim(-800, 350)
             plt.xlabel("Episode")
             plt.ylabel("Total Reward")
             plt.title(f"Training Total Reward vs Episode (up to {checkpoint_ep})")
@@ -117,7 +117,7 @@ class EpisodeCheckpointPlotCallback(BaseCallback):
             plt.plot(ep_mean, mean_rew, alpha=0.3, label="Raw")
             if len(mean_rew_s) > 0:
                 plt.plot(ep_mean_s, mean_rew_s, linewidth=2, label="Smoothed")
-            plt.ylim(-400, 350)
+            plt.ylim(-800, 350)
             plt.xlabel("Episode")
             plt.ylabel("Mean Reward")
             plt.title(f"Mean Reward vs Episode (up to {checkpoint_ep})")
@@ -230,6 +230,7 @@ class RewardConvergenceCallback(BaseCallback):
         self.last_checked_episode = 0
         self.episode_rewards = []
         self.stable_checks = 0
+        self.current_rewards = [0.0 for _ in range(n_envs)]  # accumulator
 
     def _on_step(self) -> bool:
         infos = self.locals.get("infos", [])
@@ -237,10 +238,13 @@ class RewardConvergenceCallback(BaseCallback):
 
         for i in range(self.n_envs):
             if i < len(infos):
-                if dones[i]:
-                    ep_rew = infos[i]["episode"]["r"]
-                    self.episode_rewards.append(ep_rew)
+                # accumulate rewards for this env
+                self.current_rewards[i] += infos[i].get("reward", 0.0)
 
+                if dones[i]:
+                    self.episode_rewards.append(self.current_rewards[i])
+                    self.current_rewards[i] = 0.0
+                    
         n = len(self.episode_rewards)
 
         # Need at least two windows to compare
@@ -373,8 +377,7 @@ class EpisodeFPSPenaltyCallback(BaseCallback):
         for i in range(self.n_envs):
             if i < len(infos):
                 self.current_fps_penalty[i] += infos[i].get("fps_penalty", 0.0)
-
-            self.current_steps[i] += 1
+                self.current_steps[i] += 1
 
             if dones[i]:
                 # compute mean penalty per step
@@ -409,11 +412,12 @@ class EpisodeChosenFPSCallback(BaseCallback):
         infos = self.locals.get("infos", [])
         dones = self.locals["dones"]
 
+        # Loop over all environments
         for i in range(self.n_envs):
+            # Only proceed if infos[i] exists
             if i < len(infos):
                 self.current_chosen_fps[i] += infos[i].get("chosen_fps", 0.0)
-
-            self.current_steps[i] += 1
+                self.current_steps[i] += 1
 
             if dones[i]:
                 # Compute mean FPS
@@ -457,7 +461,7 @@ if __name__ == "__main__":
         fps_choices = [1,5,10,25]
 
         current_time = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-        model_dir = f"lunar_lander_models/var_framerate_per_frame_penalty_wo_landing_penalty/{current_time}_FPS_{frame_cost_str}"
+        model_dir = f"lunar_lander_models/var_framerate/temp_padd/landing_penalty_{LANDING_PENALTY}/{current_time}_FPS_{frame_cost_str}"
         os.makedirs(model_dir, exist_ok=True)
 
         output_plots_dir = f"{model_dir}/plots"
@@ -473,7 +477,7 @@ if __name__ == "__main__":
         callback_list = CallbackList([reward_callback, nav_reward_callback, fps_penalty_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 
         # Training Settings:
-        env = make_vec_env("LunarLander_VarFramerate", n_envs=N_ENV, env_kwargs={"frame_cost": frame_cost, "max_episode_steps": 500})
+        env = make_vec_env("LunarLander_VarFramerate_TempPadd", n_envs=N_ENV, env_kwargs={"frame_cost": frame_cost, "max_episode_steps": 500})
         #env = gym.make("LunarLander_VarFramerate")
         model_architecture = "PPO"
 
@@ -525,7 +529,7 @@ if __name__ == "__main__":
         plt.figure()
         plt.plot(ep, rew, alpha=0.3, label="Raw")
         plt.plot(ep_s, rew_s, linewidth=2, label="Smoothed")
-        plt.ylim(-400, 350)
+        plt.ylim(-800, 350)
         plt.xlabel("Episode")
         plt.ylabel("Total Reward")
         plt.title(f"Training Total Reward vs Episode - FRAME COST: {frame_cost}")
@@ -543,7 +547,7 @@ if __name__ == "__main__":
         plt.figure()
         plt.plot(ep_mean, mean_rew)
         #plt.plot(ep_mean_s, mean_rew_s, linewidth=2, label="Smoothed")
-        plt.ylim(-400, 350)
+        plt.ylim(-800, 350)
         plt.xlabel("Episode")
         plt.ylabel("Mean Reward")
         plt.title("Mean Reward vs Episode")
@@ -563,7 +567,7 @@ if __name__ == "__main__":
         plt.plot(ep_nav_s, nav_rew_s, linewidth=2, label="Smoothed")
         plt.xlabel("Episode")
         plt.ylabel("Nav Reward")
-        plt.ylim(-400, 350)
+        plt.ylim(-800, 350)
         plt.title(f"Training Nav Reward vs Episode - FRAME COST: {frame_cost}")
         plt.grid(True)
         plt.savefig(os.path.join(output_plots_dir, f"train_nav_rew_vs_ep.png"), dpi=300, bbox_inches="tight")
@@ -612,7 +616,7 @@ if __name__ == "__main__":
         import random
 
         # Start Evaluation
-        eval_env = gym.make("LunarLander_VarFramerate", frame_cost=frame_cost)
+        eval_env = gym.make("LunarLander_VarFramerate_TempPadd", frame_cost=frame_cost)
         eval_env = TimeLimit(eval_env, max_episode_steps=500)
 
         n_eval_episodes = 100
@@ -656,7 +660,7 @@ if __name__ == "__main__":
         plt.figure()
         plt.plot(ep_eval, rew_eval, alpha=0.3, label="Raw")
         plt.plot(ep_eval_s, rew_eval_s, linewidth=2, label="Smoothed")
-        plt.ylim(-400, 350)
+        plt.ylim(-800, 350)
         plt.xlabel("Evaluation Episode")
         plt.ylabel("Total Reward")
         plt.title("Evaluation Reward vs Episode")

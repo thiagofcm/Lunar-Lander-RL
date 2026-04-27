@@ -57,9 +57,10 @@ MAIN_ENGINE_Y_LOCATION = (
 VIEWPORT_W = 600
 VIEWPORT_H = 400
 
-LANDING_PENALTY=0.0
+LANDING_PENALTY=400.0
 
-navigation_model_path = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo-nav.zip"
+# navigation_model_path = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo.zip" # WITH LANDING PENALTY
+navigation_model_path = "lunar_lander_models\\navigation\\01-04-2026_12-52-25\\ppo-nav.zip" # WITHOUT LANDING PENALTY
 navigation_model = PPO.load(navigation_model_path)
 
 
@@ -151,7 +152,7 @@ class LunarLander_VarFramerate(LunarLander):
 
     Lunar Lander has a large number of arguments
 
-    ```python
+    ```python 
     >>> import gymnasium as gym
     >>> env = gym.make("LunarLander-v3", continuous=False, gravity=-10.0,
     ...                enable_wind=False, wind_power=15.0, turbulence_power=1.5)
@@ -270,14 +271,14 @@ class LunarLander_VarFramerate(LunarLander):
 
         # SENSOR FRAMERATE SETTINGS:
         self.simulation_fps= FPS
-        self.fps_choices = [1,5,10,25]
+        self.fps_choices = [1,5,10,25,50]
         self.action_space = spaces.Discrete(len(self.fps_choices))
         self.navigation_action_space = spaces.Discrete(4) 
         self.current_obs = None
         self.world_step_count = 0
         self.last_sampled_obs = None
         self.steps_since_last_obs = 0
-        self.current_fps = 50
+        self.current_fps = 1
         self.acc_nav_reward = 0
         self.obs_interval = 1
         self.fps_penalty = 0.0
@@ -285,7 +286,7 @@ class LunarLander_VarFramerate(LunarLander):
 
         # MASK AND PADDING SETTINGS:
         self.obs_seq_len = 8
-        self.single_obs_dim = 10 # 8 original obs + 8 mask + 2 mask values
+        self.single_obs_dim = 10 # 8 original obs + 2 mask values
         self.obs_buffer = deque(maxlen=self.obs_seq_len)
 
         # DEBBUGING MASK
@@ -342,10 +343,6 @@ class LunarLander_VarFramerate(LunarLander):
         
         low = np.repeat(low_single[None, :], self.obs_seq_len, axis=0)
         high = np.repeat(high_single[None, :], self.obs_seq_len, axis=0)
-
-
-        # useful range is -1 .. +1, but spikes can be higher
-        #self.observation_space = spaces.Box(low, high)
 
         self.observation_space = gym.spaces.Box(
             low=low,
@@ -797,63 +794,7 @@ class LunarLander_VarFramerate(LunarLander):
         
     def get_stale_obs(self):
 
-        def safe_hover_template():
-            return np.array([
-                self.np_random.uniform(-0.1, 0.1),   # x ~ centered
-                self.np_random.uniform(0.2, 0.4),    # moderate height
-                self.np_random.uniform(-0.05, 0.05), # vx small
-                self.np_random.uniform(-0.05, 0.05), # vy small
-                self.np_random.uniform(-0.05, 0.05), # near upright
-                self.np_random.uniform(-0.05, 0.05), # low angular vel
-                0.0,
-                0.0
-            ], dtype=np.float32)
-
-        def safe_slow_descent():
-            return np.array([
-                self.np_random.uniform(-0.1, 0.1),
-                self.np_random.uniform(0.15, 0.35),
-                self.np_random.uniform(-0.05, 0.05),
-                self.np_random.uniform(-0.1, -0.02),  # small downward velocity
-                self.np_random.uniform(-0.05, 0.05),
-                self.np_random.uniform(-0.05, 0.05),
-                0.0,
-                0.0
-            ], dtype=np.float32)
-
-        def safe_hidden_drift():
-            return np.array([
-                self.np_random.uniform(-0.05, 0.05),  # looks centered
-                self.np_random.uniform(0.2, 0.4),
-                0.0,                       # vx erased
-                self.np_random.uniform(-0.05, 0.05),
-                self.np_random.uniform(-0.05, 0.05),
-                0.0,
-                0.0,
-                0.0
-            ], dtype=np.float32)
-        
-        def safe_rotation_hidden():
-            return np.array([
-                self.np_random.uniform(-0.1, 0.1),
-                self.np_random.uniform(0.2, 0.4),
-                self.np_random.uniform(-0.05, 0.05),
-                self.np_random.uniform(-0.05, 0.05),
-                0.0,                        # angle hidden
-                0.0,                        # angular velocity hidden
-                0.0,
-                0.0
-            ], dtype=np.float32)
-        
-        templates = [
-            safe_hover_template,
-            safe_slow_descent,
-            safe_hidden_drift,
-            safe_rotation_hidden
-        ]
-
-        idx = self.np_random.integers(len(templates))
-        return templates[idx]() 
+        return self.last_sampled_obs.copy() 
 
     def step(self, action):
         # Increment the world step count
@@ -863,31 +804,24 @@ class LunarLander_VarFramerate(LunarLander):
         # Increment the steps since last observation count
         self.steps_since_last_obs += 1
 
-        frame_consumed = (self.steps_since_last_obs == 1)
-
-        # Use the currently available sampled observation to compute navigation action
+        # 1. Use the currently available sampled observation to compute navigation action
         navigation_action, _ = navigation_model.predict(self.last_sampled_obs, deterministic=True)
 
-        # Perform a physics step in the environment using the navigation action,
+        # 2. Perform a physics step in the environment using the navigation action,
         # and get the new observation, navigation reward, termination status, truncation status, and info
         obs, nav_reward, terminated, truncated, info = self._physics_step(navigation_action)
         
-        # Compute the FPS penalty based on the current FPS and the simulation FPS
-        frame_penalty = self.frame_cost if frame_consumed else 0.0
-        reward = nav_reward - frame_penalty
-
-        self.fps_penalty += frame_penalty
-
-        # Update the current observation with the new observation obtained from the physics step
+        # 3. Update the current observation with the new observation obtained from the physics step
         self.current_obs = obs.copy()
 
-        # Check if it's time to sample a new observation based on the obs_interval
+        # 4. Check if it's time to sample a new observation based on the obs_interval
         # If so, update the last sampled observation, reset the steps since last observation count, and increment the episode frame count
         if self.steps_since_last_obs >= self.obs_interval:
             # self.current_obs is updated every physics step, so here we store the fresh observation of this step
             self.last_sampled_obs = self.current_obs.copy()
             self.steps_since_last_obs = 0
             self.episode_frame_count += 1
+            frame_consumed = True
 
             # Update FPS and obs_interval based on the action taken by the agent
             # the action is chosen at a sampling instant and affects future sampling
@@ -904,37 +838,43 @@ class LunarLander_VarFramerate(LunarLander):
         else:
             # If it's not time to sample a new observation, we use the last sampled
             # observation (self.last_sampled_obs is not updated)
-            # get_stale_obs() generates a random observation to simulate the staleness and uncertainty of not having a fresh observation.
+            # get_stale_obs() generates a padded observation.
             obs_values = self.get_stale_obs()
 
             # Debbuging mask, which indicates which values in the observation are valid (1 for valid, 0 for invalid)
             obs_mask = np.zeros_like(self.last_sampled_obs, dtype=np.float32)
+            frame_consumed = False
+        
+        # 5. Compute reward based on the navigation reward obtained from the physics step, and apply a penalty if a new frame was consumed
+        frame_penalty = self.frame_cost if frame_consumed else 0.0
+        reward = nav_reward - frame_penalty
 
-        # DEBBGING: store the observation mask in a separate buffer for analysis
+        # DEBBUGING: Cumulate the fps penalty for the episode, which can be used for analysis and debugging
+        self.fps_penalty += frame_penalty
+
+        # DEBBUGING: store the observation mask in a separate buffer for analysis
         self.mask_buffer.append(obs_mask.copy())
 
-        # Adds extra info (age ratio and fps ratio), and appends it to the observation buffer
+        # 6. Adds extra info (age ratio and fps ratio), and appends it to the observation buffer
         aug_obs = self._get_augmented_obs(obs_values)
         self.obs_buffer.append(aug_obs.copy())
 
         new_obs = self._get_sequence_obs()
         
         #print(f"Observation on STEP: {new_obs}")
+        print("=" * 80)
+        print("STEP")
 
+        for i in range(new_obs.shape[0]):
+            obs_vals = new_obs[i, :8]
+            extras = new_obs[i, 8:10]
+            mask_vals = self.mask_buffer[i]
 
-        # print("=" * 80)
-        # print("STEP")
-
-        # for i in range(new_obs.shape[0]):
-        #     obs_vals = new_obs[i, :8]
-        #     extras = new_obs[i, 8:10]
-        #     mask_vals = self.mask_buffer[i]
-
-        #     print(f"[timestep {i}]")
-        #     print(f"  obs:   {obs_vals}")
-        #     print(f"  mask:  {mask_vals}  (sum={mask_vals.sum()})")
-        #     print(f"  extra: age_ratio={extras[0]:.3f}, fps_ratio={extras[1]:.3f}")
-        #     print("-" * 40)
+            print(f"[timestep {i}]")
+            print(f"  obs:   {obs_vals}")
+            print(f"  mask:  {mask_vals}  (sum={mask_vals.sum()})")
+            print(f"  extra: age_ratio={extras[0]:.3f}, fps_ratio={extras[1]:.3f}")
+            print("-" * 40)
 
 
         info = dict(info)
@@ -1100,7 +1040,23 @@ class LunarLander_VarFramerate(LunarLander):
             self.isopen = False
 
 register(
-    id="LunarLander_VarFramerate",
-    entry_point="scripts.lunar_lander_var_fps:LunarLander_VarFramerate",
+    id="LunarLander_VarFramerate_SimplePadded",
+    entry_point="scripts.lunar_lander_var_fps_simple_padd:LunarLander_VarFramerate",
     #max_episode_steps=500
 )
+
+
+# step N:
+#   1. predict navigation_action from last_sampled_obs (OLD obs)
+#   2. physics step → produces new obs
+#   3. current_obs = new obs
+#   4. sampling check → IF time to sample:
+#      last_sampled_obs = current_obs  ← NEW obs saved here
+#      frame_consumed = True
+#      frame_penalty applied to reward of step N
+
+# step N+1:
+#   1. predict navigation_action from last_sampled_obs (NEW obs) ← benefit felt HERE
+#   2. physics step → ...
+
+# so the penalty for a fresh obs is given at the moment it happens but the reward for a fresh obs is felt in the next step
