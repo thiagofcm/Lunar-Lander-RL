@@ -1,0 +1,14 @@
+# Weight A=400 - With landing penalty
+lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_10-27-07_FPS_0_0\plots\checkpoint_ep_19000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_15-20-04_FPS_0_1\plots\checkpoint_ep_51000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_20-53-52_FPS_0_2\plots\checkpoint_ep_32000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_02-48-41_FPS_0_3\plots\checkpoint_ep_15000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_00-42-05_FPS_0_4\plots\checkpoint_ep_13000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_19-00-36_FPS_0_5\plots\checkpoint_ep_23000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_09-01-55_FPS_0_6\plots\checkpoint_ep_20000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_16-02-43_FPS_0_7\plots\checkpoint_ep_25000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_02-29-35_FPS_0_8\plots\checkpoint_ep_2000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_04-50-31_FPS_0_9\plots\checkpoint_ep_21000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_04-49-47_FPS_1_0\plots\checkpoint_ep_23000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_11-41-12_FPS_2_0\plots\checkpoint_ep_40000\model.zip
+lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_18-44-44_FPS_3_0\plots\checkpoint_ep_40000\model.zip

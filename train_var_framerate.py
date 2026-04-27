@@ -446,7 +446,8 @@ if __name__ == "__main__":
     )
     N_ENV = 16
 
-    frame_cost_grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 3.0]
+    #frame_cost_grid = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 2.0, 3.0]
+    frame_cost_grid = [3.0]
 
     for frame_cost in frame_cost_grid:
 
@@ -467,7 +468,7 @@ if __name__ == "__main__":
         nav_reward_callback = EpisodeNavRewardCallback(n_envs=N_ENV)
         fps_penalty_callback = EpisodeFPSPenaltyCallback(n_envs=N_ENV)
         chosen_fps_callback = EpisodeChosenFPSCallback(n_envs=N_ENV)
-        convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=10.0, patience=10, min_episodes=2000, verbose=1)
+        convergence_callback = RewardConvergenceCallback(n_envs=N_ENV, window_size=1000, tolerance=20.0, patience=10, min_episodes=2000, verbose=1)
         checkpoint_plot_callback = EpisodeCheckpointPlotCallback(reward_callback=reward_callback,chosen_fps_callback=chosen_fps_callback,output_root_dir=output_plots_dir,checkpoint_every_episodes=1000,smooth_window=20,fps_penalty_callback=fps_penalty_callback, frame_cost=frame_cost,verbose=1)
         callback_list = CallbackList([reward_callback, nav_reward_callback, fps_penalty_callback, chosen_fps_callback, convergence_callback, checkpoint_plot_callback])
 

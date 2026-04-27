@@ -1,0 +1,32 @@
+Best checkpoint per frame cost
+=================================================================
+  Frame Cost |           Best Checkpoint |  Mean Reward |      Std
+-----------------------------------------------------------------
+        0.00 |       checkpoint_ep_19000 |       227.07 |    23.59
+        0.10 |       checkpoint_ep_51000 |       216.66 |    25.06
+        0.20 |       checkpoint_ep_32000 |       208.90 |    25.76
+        0.30 |       checkpoint_ep_15000 |       191.04 |    26.20
+        0.40 |       checkpoint_ep_13000 |       183.77 |    24.43
+        0.50 |       checkpoint_ep_23000 |       177.31 |    78.14
+        0.60 |       checkpoint_ep_20000 |       164.59 |    44.97
+        0.70 |       checkpoint_ep_25000 |       161.50 |    80.02
+        0.80 |        checkpoint_ep_2000 |       131.23 |    30.80
+        0.90 |       checkpoint_ep_21000 |       147.16 |    91.27
+        1.00 |       checkpoint_ep_23000 |       131.25 |    82.91
+        2.00 |       checkpoint_ep_40000 |        83.34 |   101.38
+        3.00 |       checkpoint_ep_40000 |        46.95 |   102.44
+
+Full paths:
+  0.0: lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_10-27-07_FPS_0_0\plots\checkpoint_ep_19000\model.zip
+  0.1: lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_15-20-04_FPS_0_1\plots\checkpoint_ep_51000\model.zip
+  0.2: lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_20-53-52_FPS_0_2\plots\checkpoint_ep_32000\model.zip
+  0.3: lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_02-48-41_FPS_0_3\plots\checkpoint_ep_15000\model.zip
+  0.4: lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_00-42-05_FPS_0_4\plots\checkpoint_ep_13000\model.zip
+  0.5: lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_19-00-36_FPS_0_5\plots\checkpoint_ep_23000\model.zip
+  0.6: lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_09-01-55_FPS_0_6\plots\checkpoint_ep_20000\model.zip
+  0.7: lunar_lander_models\var_framerate_per_frame_penalty\16-04-2026_16-02-43_FPS_0_7\plots\checkpoint_ep_25000\model.zip
+  0.8: lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_02-29-35_FPS_0_8\plots\checkpoint_ep_2000\model.zip
+  0.9: lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_04-50-31_FPS_0_9\plots\checkpoint_ep_21000\model.zip
+  1.0: lunar_lander_models\var_framerate_per_frame_penalty\17-04-2026_04-49-47_FPS_1_0\plots\checkpoint_ep_23000\model.zip
+  2.0: lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_11-41-12_FPS_2_0\plots\checkpoint_ep_40000\model.zip
+  3.0: lunar_lander_models\var_framerate_per_frame_penalty\18-04-2026_18-44-44_FPS_3_0\plots\checkpoint_ep_40000\model.zip

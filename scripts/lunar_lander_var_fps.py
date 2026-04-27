@@ -57,6 +57,8 @@ MAIN_ENGINE_Y_LOCATION = (
 VIEWPORT_W = 600
 VIEWPORT_H = 400
 
+LANDING_PENALTY=0.0
+
 navigation_model_path = "lunar_lander_models\\navigation\\15-04-2026_17-00-41\\ppo-nav.zip"
 navigation_model = PPO.load(navigation_model_path)
 
@@ -132,7 +134,7 @@ class LunarLander_VarFramerate(LunarLander):
     The lander starts at the top center of the viewport with a random initial
     force applied to its center of mass.
 
-    ## Episode Termination
+    ## Episode Termination/. 
     The episode finishes if:
     1) the lander crashes (the lander body gets in contact with the moon);
     2) the lander gets outside of the viewport (`x` coordinate is greater than 1);
@@ -762,7 +764,7 @@ class LunarLander_VarFramerate(LunarLander):
         # --- Smooth landing penalty ---
         touchdown_check = (state[6] or state[7]) and not self.touchdown_flag
         if touchdown_check:
-            reward -= 0 * abs(state[3])  # vertical velocity
+            reward -= LANDING_PENALTY * abs(state[3])  # vertical velocity
             #reward -= 5 * abs(state[2])  # horizontal velocity
             #reward -= 5 * abs(state[4])  # body tilt
         self.touchdown_flag = bool(state[6] or state[7])
@@ -856,6 +858,7 @@ class LunarLander_VarFramerate(LunarLander):
     def step(self, action):
         # Increment the world step count
         self.world_step_count += 1
+        #print("FRAME COST: ", self.frame_cost)
 
         # Increment the steps since last observation count
         self.steps_since_last_obs += 1

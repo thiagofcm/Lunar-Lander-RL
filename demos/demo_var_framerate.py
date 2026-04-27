@@ -52,6 +52,12 @@ if __name__ == "__main__":
         done = False
         truncated = False
         total_reward = 0
+        touchdown_flag = False
+
+        unwrapped = eval_env.unwrapped
+        W = 600 / 30.0
+        helipad_x1_norm = (unwrapped.helipad_x1 - W/2) / (W/2)
+        helipad_x2_norm = (unwrapped.helipad_x2 - W/2) / (W/2)
 
         while not (done or truncated):
             action, _ = model.predict(obs, deterministic=True)
@@ -60,7 +66,12 @@ if __name__ == "__main__":
             episode_fps.append(info["chosen_fps"])
             print(f"Chosen FPS: {info['chosen_fps']}")
             print("===============================")
-
+            # # Print x, y at first touchdown
+            # if (obs[-1][6] or obs[-1][7]) and not touchdown_flag:
+            #             print(f"Episode {ep+1} | Touchdown → x: {obs[-1][0]:.4f} | Flags: [{helipad_x1_norm:.4f}, {helipad_x2_norm:.4f}]")
+            #             landed_in_flags = helipad_x1_norm < obs[-1][0] < helipad_x2_norm
+            #             print(f"Landed in flags: {landed_in_flags}")
+            #             touchdown_flag = True
 
         episode_rewards.append(total_reward)
 
